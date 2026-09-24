@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pymupdf
+python-pptx
+python-docx
+sentence-transformers
+numpy
+requests

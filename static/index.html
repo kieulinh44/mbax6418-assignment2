@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Course Assistant</title>
+<style>
+  :root{--bg:#fafafa;--card:#fff;--border:#e2e2e2;--text:#1a1a1a;--muted:#666;--accent:#2f6fed;}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);margin:0}
+  header{padding:18px 24px;background:var(--card);border-bottom:1px solid var(--border)}
+  header h1{font-size:18px;margin:0}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  main{max-width:880px;margin:0 auto;padding:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px}
+  label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
+  select,input[type=text]{width:100%;padding:9px;border:1px solid var(--border);border-radius:6px;font-size:14px}
+  textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:14px;min-height:70px;font-family:inherit}
+  button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:10px 16px;font-size:14px;cursor:pointer;margin-top:10px}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  .row{display:flex;gap:12px}
+  .row>div{flex:1}
+  .cite{border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0}
+  .cite .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .cite pre{white-space:pre-wrap;font-size:13px;background:#f6f6f6;border-radius:6px;padding:8px;max-height:140px;overflow:auto}
+  .cite img{max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:8px}
+  .answer{line-height:1.55;font-size:14.5px}
+  .muted{color:var(--muted);font-size:13px}
+  .tag{display:inline-block;background:#eef3ff;color:var(--accent);border-radius:20px;padding:2px 10px;font-size:12px;margin:0 4px 4px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 Course Assistant</h1>
+  <p>Answers questions and (soon) generates practice quizzes from your course materials.</p>
+</header>
+<main>
+  <div class="card">
+    <label>Course files in the index</label>
+    <div id="files" class="muted">Loading…</div>
+  </div>
+
+  <div class="card">
+    <label for="q">Ask a question about the material</label>
+    <div class="row">
+      <div><select id="doc"><option value="">All documents</option></select></div>
+      <div><input type="text" id="topic" placeholder="Optional topic filter (e.g. regression)"></div>
+    </div>
+    <textarea id="q" placeholder="e.g. What is the intuition behind regularization?"></textarea>
+    <button id="askBtn">Ask</button>
+  </div>
+
+  <div id="result" class="card" style="display:none">
+    <div id="answer" class="answer"></div>
+  </div>
+
+  <div id="sources"></div>
+
+<script>
+async function refreshFiles(){
+  const r = await fetch('/api/files');
+  const {documents} = await r.json();
+  const files = document.getElementById('files');
+  const sel = document.getElementById('doc');
+  if(!documents.length){ files.textContent = 'No files ingested yet. Put course files in data/raw and run ingest.'; return; }
+  files.innerHTML = documents.map(d =>
+    `<span class="tag">${d.file} · ${d.pages} page/slide${d.segments>1?' · '+d.segments+' sections':''}</span>`).join('');
+  sel.innerHTML = '<option value="">All documents</option>' +
+    documents.map(d=>`<option value="${d.doc}">${d.file}</option>`).join('');
+}
+async function ask(){
+  const btn = document.getElementById('askBtn');
+  btn.disabled = true; btn.textContent = 'Asking…';
+  const payload = {
+    question: document.getElementById('q').value,
+    doc: document.getElementById('doc').value || null,
+    topic: document.getElementById('topic').value || null,
+  };
+  try{
+    const r = await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data = await r.json();
+    document.getElementById('result').style.display='block';
+    document.getElementById('answer').textContent = data.answer;
+    const s = document.getElementById('sources');
+    if(data.sources){
+      s.innerHTML = '<h3 style="font-size:15px;margin:6px 0">Sources</h3>' + data.sources.map(c=>`
+        <div class="cite"><div class="meta"><strong>${c.file}</strong> · page/slide ${c.page}${c.section?` · ${c.section}`:''}</div>
+        <pre>${escapeHtml(c.excerpt)}</pre>
+        ${c.image?`<img src="${c.image}" alt="page ${c.page}">`:''}</div>`).join('');
+    }
+  }catch(e){ alert('Error: '+e); }
+  finally{ btn.disabled=false; btn.textContent='Ask'; }
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+document.getElementById('askBtn').onclick = ask;
+refreshFiles();
+</script>
+</body>
+</html>

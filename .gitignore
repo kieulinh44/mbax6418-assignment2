@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Course materials & generated index — NOT committed (public repo; may be copyrighted)
+data/raw/
+data/index/
+*.png
+*.json.gz
+
+# Local secrets / env
+.env
