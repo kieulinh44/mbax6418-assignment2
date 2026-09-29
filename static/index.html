@@ -5,95 +5,249 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Course Assistant</title>
 <style>
-  :root{--bg:#fafafa;--card:#fff;--border:#e2e2e2;--text:#1a1a1a;--muted:#666;--accent:#2f6fed;}
+  :root{--bg:#fafafa;--card:#fff;--border:#e2e2e2;--text:#1a1a1a;--muted:#666;--accent:#2f6fed;--good:#1a9d4c;--bad:#d64545}
   *{box-sizing:border-box}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);margin:0}
-  header{padding:18px 24px;background:var(--card);border-bottom:1px solid var(--border)}
+  header{padding:16px 24px;background:var(--card);border-bottom:1px solid var(--border)}
   header h1{font-size:18px;margin:0}
   header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .tabs{display:flex;gap:6px;margin-top:12px}
+  .tab{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:14px;color:var(--muted);cursor:pointer}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
   main{max-width:880px;margin:0 auto;padding:24px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px}
   label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
   select,input[type=text]{width:100%;padding:9px;border:1px solid var(--border);border-radius:6px;font-size:14px}
+  select.inline,input.inline{width:auto}
   textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:14px;min-height:70px;font-family:inherit}
   button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:10px 16px;font-size:14px;cursor:pointer;margin-top:10px}
   button:disabled{opacity:.6;cursor:not-allowed}
-  .row{display:flex;gap:12px}
+  button.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  .row{display:flex;gap:12px;align-items:flex-end}
   .row>div{flex:1}
   .cite{border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0}
   .cite .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
   .cite pre{white-space:pre-wrap;font-size:13px;background:#f6f6f6;border-radius:6px;padding:8px;max-height:140px;overflow:auto}
-  .cite img{max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:8px}
+  .cite img,.source img{max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:8px}
   .answer{line-height:1.55;font-size:14.5px}
   .muted{color:var(--muted);font-size:13px}
   .tag{display:inline-block;background:#eef3ff;color:var(--accent);border-radius:20px;padding:2px 10px;font-size:12px;margin:0 4px 4px 0}
+  .qa {display:block}
+  .quizpanel{display:none}
+  /* quiz styling */
+  .question{border:1px solid var(--border);border-radius:8px;padding:14px;margin:12px 0}
+  .question h3{font-size:15px;margin:0 0 10px;line-height:1.4}
+  .opt{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin:6px 0;cursor:pointer;font-size:14px}
+  .opt:hover{background:#f3f7ff}
+  .opt input{margin-top:3px}
+  .opt.good{border-color:var(--good);background:#eaf8ef}
+  .opt.bad{border-color:var(--bad);background:#fdeeee}
+  .opt .letter{font-weight:700;color:var(--muted);min-width:18px}
+  .score{font-size:17px;font-weight:700;color:var(--accent);margin-bottom:8px}
+  .expl{font-size:13.5px;background:#f6f6f6;border-left:3px solid var(--accent);padding:8px 10px;border-radius:0 6px 6px 0;margin-top:8px}
+  details.source{margin-top:8px}
+  details.source summary{font-size:12.5px;color:var(--muted);cursor:pointer}
+.sel{display:inline-flex;align-items:center;gap:8px;margin-top:10px}
+.mat{display:inline-flex;gap:6px;align-items:center;margin:4px 8px 4px 0;padding:7px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text);font-size:13.5px}
+.mat:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
 <header>
   <h1>📚 Course Assistant</h1>
-  <p>Answers questions and (soon) generates practice quizzes from your course materials.</p>
+  <p>Answers questions and generates practice quizzes from your course materials.</p>
+  <div class="tabs">
+    <button class="tab active" data-tab="qa">Q&amp;A</button>
+    <button class="tab" data-tab="quiz">Practice Quiz</button>
+  </div>
 </header>
 <main>
   <div class="card">
-    <label>Course files in the index</label>
-    <div id="files" class="muted">Loading…</div>
+    <label>Course materials — download &amp; upload</label>
+    <p class="muted">Source files the assistant reads (slides, syllabus, notes). Accepted formats: PDF, PPTX, DOCX, Markdown/TXT. Download them, or add new material straight from this page.</p>
+    <div id="materials">Loading…</div>
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+      <label for="uploadInput">Add material from this device</label>
+      <div class="row">
+        <div><input type="file" id="uploadInput" multiple accept=".pdf,.pptx,.docx,.md,.txt"></div>
+        <div style="max-width:170px"><button id="uploadBtn" class="ghost">Upload &amp; index</button></div>
+      </div>
+      <div id="uploadStatus" class="muted"></div>
+    </div>
   </div>
 
-  <div class="card">
+  <!-- ================= Q&A ================= -->
+  <section class="qa card">
+    <label>Course files in the index</label>
+    <div id="files" class="muted">Loading…</div>
+
     <label for="q">Ask a question about the material</label>
     <div class="row">
       <div><select id="doc"><option value="">All documents</option></select></div>
       <div><input type="text" id="topic" placeholder="Optional topic filter (e.g. regression)"></div>
     </div>
-    <textarea id="q" placeholder="e.g. What is the intuition behind regularization?"></textarea>
+    <textarea id="q" placeholder="e.g. What is the intuition behind RAG?"></textarea>
     <button id="askBtn">Ask</button>
-  </div>
+  </section>
+  <section class="qa" id="result" style="display:none">
+    <div class="card answer" id="answer"></div>
+    <div id="sources"></div>
+  </section>
 
-  <div id="result" class="card" style="display:none">
-    <div id="answer" class="answer"></div>
-  </div>
-
-  <div id="sources"></div>
+  <!-- ================= QUIZ ================= -->
+  <section class="quizpanel">
+    <div class="card">
+      <label>Generate a practice quiz from the material</label>
+      <div class="row">
+        <div><select id="qdoc"><option value="">All documents</option></select></div>
+        <div><input type="text" id="qtopic" placeholder="Optional topic filter (e.g. RAG)"></div>
+      </div>
+      <div class="row">
+        <div><label for="qtheme">Optional focus (leave blank to use selection)</label>
+          <input type="text" id="qtheme" placeholder="e.g. embedding-based semantic search"></div>
+        <div style="max-width:160px"><label for="qn">Questions</label>
+          <select id="qn" class="inline"><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+      </div>
+      <button id="genBtn">Generate quiz</button>
+    </div>
+    <div id="quizhere"></div>
+  </section>
 
 <script>
+const $ = id => document.getElementById(id);
+let quizId = null;
+
 async function refreshFiles(){
+  await loadMaterials();
   const r = await fetch('/api/files');
   const {documents} = await r.json();
-  const files = document.getElementById('files');
-  const sel = document.getElementById('doc');
+  const files = $('files');
   if(!documents.length){ files.textContent = 'No files ingested yet. Put course files in data/raw and run ingest.'; return; }
-  files.innerHTML = documents.map(d =>
-    `<span class="tag">${d.file} · ${d.pages} page/slide${d.segments>1?' · '+d.segments+' sections':''}</span>`).join('');
-  sel.innerHTML = '<option value="">All documents</option>' +
-    documents.map(d=>`<option value="${d.doc}">${d.file}</option>`).join('');
+  files.innerHTML = documents.map(d=>`<span class="tag">${d.file} · ${d.pages} page/slide</span>`).join('');
+  const opts = '<option value="">All documents</option>'+documents.map(d=>`<option value="${d.doc}">${d.file}</option>`).join('');
+  $('doc').innerHTML = opts; $('qdoc').innerHTML = opts;
 }
-async function ask(){
-  const btn = document.getElementById('askBtn');
-  btn.disabled = true; btn.textContent = 'Asking…';
-  const payload = {
-    question: document.getElementById('q').value,
-    doc: document.getElementById('doc').value || null,
-    topic: document.getElementById('topic').value || null,
-  };
+async function loadMaterials(){
+  const el = $('materials');
   try{
-    const r = await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const data = await r.json();
-    document.getElementById('result').style.display='block';
-    document.getElementById('answer').textContent = data.answer;
-    const s = document.getElementById('sources');
-    if(data.sources){
-      s.innerHTML = '<h3 style="font-size:15px;margin:6px 0">Sources</h3>' + data.sources.map(c=>`
-        <div class="cite"><div class="meta"><strong>${c.file}</strong> · page/slide ${c.page}${c.section?` · ${c.section}`:''}</div>
-        <pre>${escapeHtml(c.excerpt)}</pre>
-        ${c.image?`<img src="${c.image}" alt="page ${c.page}">`:''}</div>`).join('');
-    }
+    const r = await fetch('/api/materials');
+    const {materials} = await r.json();
+    if(!materials.length){ el.innerHTML = '<span class="muted">No material files on the server yet.</span>'; return; }
+    el.innerHTML = materials.map(m=>`<a class="mat" href="${m.url}" download>📄 ${esc(m.file)} <span class="muted">(${fmtBytes(m.size)})</span></a>`).join('');
+  }catch(e){ el.innerHTML = '<span class="muted">Materials unavailable.</span>'; }
+}
+function fmtBytes(b){ return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB'; }
+async function uploadFiles(){
+  const inp=$('uploadInput'), btn=$('uploadBtn'), st=$('uploadStatus');
+  if(!inp.files.length){ st.textContent='Pick a file first.'; return; }
+  btn.disabled=true; st.textContent='Uploading & indexing… (large decks take a minute)';
+  const fd=new FormData();
+  for(const f of inp.files) fd.append('files', f);
+  try{
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    const data=await r.json();
+    if(!r.ok){ st.textContent='✗ '+(data.detail||'Upload failed'); return; }
+    st.textContent='✓ Indexed: '+data.result.added.join(', ')+' · '+data.result.pages+' pages total.';
+    inp.value=''; await refreshFiles();
+  }catch(e){ st.textContent='✗ Error: '+e; }
+  finally{ btn.disabled=false; }
+}
+
+/* ---------- Q&A ---------- */
+async function ask(){
+  const btn=$('askBtn'); btn.disabled=true; btn.textContent='Asking…';
+  const payload={question:$('q').value, doc:$('doc').value||null, topic:$('topic').value||null};
+  try{
+    const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await r.json();
+    $('result').style.display='block';
+    $('answer').textContent=data.answer;
+    const s=$('sources');
+    s.innerHTML=(data.sources||[]).map(c=>`
+      <div class="card cite"><div class="meta"><strong>${c.file}</strong> · page/slide ${c.page}${c.section?` · ${c.section}`:''}</div>
+      <pre>${esc(c.excerpt)}</pre>${c.image?`<img src="${c.image}" alt="page ${c.page}">`:''}</div>`).join('');
   }catch(e){ alert('Error: '+e); }
   finally{ btn.disabled=false; btn.textContent='Ask'; }
 }
-function escapeHtml(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-document.getElementById('askBtn').onclick = ask;
+
+/* ---------- QUIZ ---------- */
+async function generateQuiz(){
+  const btn=$('genBtn'); btn.disabled=true; btn.textContent='Generating…';
+  const payload={doc:$('qdoc').value||null, topic:$('qtopic').value||null, theme:$('qtheme').value||null, n:+$('qn').value};
+  try{
+    const r=await fetch('/api/quiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok){ const e=await r.json(); alert(e.detail||'Generation failed'); $('quizhere').innerHTML=''; return; }
+    const q=await r.json();
+    quizId=q.quiz_id;
+    $('quizhere').innerHTML =
+      `<div class="card"><div class="score">${q.title}</div>
+       <p class="muted">Answer each question, then grade. Solutions are revealed only after you answer or request them.</p>
+       ${q.questions.map((qst,idx)=>`
+        <div class="question" id="qb-${qst.id}">
+          <h3>${idx+1}. ${esc(qst.question)}</h3>
+          ${qst.options.map((opt,i)=>`
+            <label class="opt"><input type="radio" name="${qst.id}" value="${i}">
+              <span class="letter">${"ABCD"[i]}.</span><span>${esc(opt)}</span></label>`).join('')}
+          <details class="source"><summary>Source: ${esc(qst.source.file)} · page/slide ${qst.source.page}</summary>
+            <pre>${esc(qst.source.excerpt)}</pre>${qst.source.image?`<img src="${qst.source.image}">`:''}</details>
+        </div>`).join('')}
+       <button id="gradeBtn">Check answers</button>
+       <button id="revealBtn" class="ghost">Reveal solutions</button>
+       <div id="quizres"></div></div>`;
+    $('gradeBtn').onclick = grade; $('revealBtn').onclick = ()=>grade(true);
+  }catch(e){ alert('Error: '+e); }
+  finally{ btn.disabled=false; btn.textContent='Generate quiz'; }
+}
+function collectAnswers(){
+  const answers={};
+  document.querySelectorAll('.question').forEach(qb=>{
+    const sel=qb.querySelector('input:checked');
+    if(sel) answers[qb.id.replace('qb-','')]=+sel.value;
+  });
+  return answers;
+}
+async function grade(revealOnly){
+  const payload={quiz_id:quizId, answers:revealOnly?{}:collectAnswers()};
+  const r=await fetch('/api/quiz/grade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const res=await r.json();
+  const hasAnswers=(res.results||[]).some(x=>x.your_answer!=null);
+  let html='<div class="card">';
+  if(hasAnswers) html+=`<div class="score">Score: ${res.score}/${res.total} (${res.percent}%)</div>`;
+  else html+=`<div class="score">Solutions (from the fixed answer key)</div>`;
+  res.results.forEach(x=>{
+    const qid=x.id;
+    const qb=document.getElementById('qb-'+qid);
+    const radios=qb.querySelectorAll('input[type=radio]');
+    // mark options
+    radios.forEach((inp,i)=>{
+      const label=inp.closest('.opt'); label.classList.remove('good','bad');
+      if(i===x.correct_answer) label.classList.add('good');
+      else if(x.your_answer!=null && i===x.your_answer) label.classList.add('bad');
+      inp.disabled=true;
+    });
+    html+=`<div class="expl"><strong>Q: ${qid.toUpperCase()}</strong> — Correct: ${"ABCD"[x.correct_answer]}`+
+          (x.your_answer!=null?` · Your answer: ${"ABCD"[x.your_answer]} · ${x.correct?'✓':'✗'}`:'')+
+          `</div><div class="expl">${esc(x.explanation)}</div>`;
+  });
+  html+='</div>';
+  $('quizres').innerHTML=html;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelector('.qa').style.display = name==='qa'?'block':'none';
+  document.querySelector('.quizpanel').style.display = name==='quiz'?'block':'none';
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
+$('askBtn').onclick=ask;
+$('genBtn').onclick=generateQuiz;
+$('uploadBtn').onclick=uploadFiles;
 refreshFiles();
+// allow deep-linking to a tab, e.g. ?tab=quiz (used for screenshots/docs)
+const _tabParam = new URLSearchParams(location.search).get('tab');
+if(_tabParam === 'quiz') switchTab('quiz');
 </script>
 </body>
 </html>

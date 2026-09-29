@@ -7,7 +7,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import config, ingest, retrieval  # noqa: E402
+from app import config, ingest, hybrid  # noqa: E402
 
 
 def main():
@@ -18,9 +18,9 @@ def main():
     if not pages:
         print("No supported files found. Put PDFs/pptx/docx/md/txt into data/raw first.")
         return
-    print("Building embedding index…")
-    vecs = retrieval.build_index(pages)
-    print(f"Index ready: {len(pages)} pages, vectors {vecs.shape}")
+    print("Building hybrid index (keyword BM25 + text embeddings + visual CLIP images)…")
+    hybrid.rebuild_index()
+    print(f"Hybrid index ready: {len(pages)} pages in chromadb + bm25s.")
 
 
 if __name__ == "__main__":

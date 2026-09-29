@@ -1,8 +1,12 @@
 fastapi
 uvicorn[standard]
+python-multipart
 pymupdf
 python-pptx
 python-docx
 sentence-transformers
 numpy
 requests
+bm25s
+langchain-text-splitters
+chromadb

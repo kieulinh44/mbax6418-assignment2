@@ -3,8 +3,13 @@
 A course assistant that **answers questions** and **generates practice quizzes**
 using course materials (slides, syllabus, and other files from Canvas).
 
-**Status: phase 1 skeleton** — ingest + grounded Q&A with sources and page images.
-Quizzes are the next phase.
+**Status:** hybrid-RAG Q&A **and** practice-quiz generator, both live.
+
+## Screenshots
+
+| Q&A (ask + download course materials) | Practice quiz |
+|----------------------------------------|---------------|
+| ![Q&A dashboard](docs/screenshots/qa.jpg) | ![Practice quiz](docs/screenshots/quiz.jpg) |
 
 ## What the app accepts
 | Format | Text | Page/slide image |
@@ -14,7 +19,9 @@ Quizzes are the next phase.
 | `.docx` | ✅ | ⏳ phase 2 |
 | `.md` / `.txt` | ✅ | n/a |
 
-The front page documents this list.
+From the dashboard, students can **download the source files** or **upload new
+material** (PDF/PPTX/DOCX/MD/TXT); uploads are ingested and indexed
+incrementally without restarting the server.
 
 ## Setup
 ```bash
@@ -45,10 +52,24 @@ python -m uvicorn app.main:app --reload --port 8000
 Then ask: "What is L2 regularization and how does it differ from L1?"
 
 ## Architecture
-COURSE FILES → ingest (text + rendered page image per page) → vector index
-→ retrieve(question, [doc filter], [topic filter]) → grounded answer via the
-local reasoning model, with a vision pass over the top page's image to read
-diagrams/charts → cited sources + original page images shown in the browser.
+
+**Hybrid RAG** over the course materials:
+
+```
+course files → ingest (text + rendered page/slide image per page)
+            → chunk pages (text splitter) preserving doc·page·section
+            → three separate indexes in chromadb + bm25s:
+                keyword (BM25)  ·  text embeddings (all-MiniLM)  ·  visual (CLIP images)
+query → run all three → reciprocal-rank fusion (rerank)
+     → top text chunks + their page images as evidence
+     → grounded answer (DeepSeek) + vision pass (Qwen) over relevant images
+     → {answer, sources, validation} — sources validated against evidence
+```
+
+- **Chunking:** `langchain-text-splitters` (`RecursiveCharacterTextSplitter`), each chunk tagged with doc/file/page/section.
+- **Keyword:** `bm25s`; **text vectors:** `chromadb` collection with all-MiniLM; **visual vectors:** `chromadb` collection with CLIP `clip-ViT-B-32` over every page image, queried cross-modally by the text question.
+- **Combine/rerank:** Reciprocal Rank Fusion across the three ranked lists, collapsed to pages keeping each page's best chunk + original image.
+- **Validation:** after generation, citations are checked against the retrieved evidence; the response carries separate `answer` and `sources` fields plus `validation.all_sources_supported`.
 
 ## Notes
 - Course material and the generated index are **gitignored** (public repo;
