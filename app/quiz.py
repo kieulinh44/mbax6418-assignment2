@@ -86,9 +86,16 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
         "Return ONLY the JSON array — no prose, no markdown fences."
     )
     user = ("Generate a practice quiz about: " + theme + "\n\nCOURSE MATERIAL:\n" + context)
-    raw = llm.chat([{"role": "system", "content": sys},
-                    {"role": "user", "content": user}], max_tokens=max_tokens)
+    try:
+        raw = llm.chat([{"role": "system", "content": sys},
+                        {"role": "user", "content": user}], max_tokens=max_tokens)
+    except Exception as e:
+        # Model service down: report that honestly instead of a misleading 404.
+        raise RuntimeError(f"model service unavailable ({type(e).__name__})") from e
     data = _extract_json(raw)
+    if not isinstance(data, list):
+        # Model responded, but with unusable output — also not "no matching material".
+        raise RuntimeError("model output could not be parsed into quiz questions — try again")
     questions = []
     look = _build_lookup(hits)
     n = max(2, min(n, 6))

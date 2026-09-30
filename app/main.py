@@ -192,7 +192,22 @@ def ask(payload: dict):
     try:
         answer = llm.chat([{"role": "system", "content": sys}, {"role": "user", "content": user}])
     except Exception as e:
-        raise HTTPException(502, f"Model call failed: {e}")
+        # Model service down: degrade gracefully, stay honest, never leak details.
+        top = hits[0]["page"]
+        excerpt = (top.get("text") or "")[:400]
+        fallback_answer = (
+            "The AI model service is currently unavailable, so I could not generate "
+            "a full answer. The closest material I found is:\n\n"
+            f"[{top['file']} p.{top['page']}] {excerpt}".strip()
+        )
+        return {
+            "answer": fallback_answer,
+            "sources": [_cite(h["page"], excerpt=h["chunk"]) for h in hits],
+            "vision_notes": "",
+            "validation": _validate(fallback_answer, hits),
+            "retrieval": "hybrid(keyword+text+visual)",
+            "service_unavailable": True,
+        }
 
     return {
         "answer": answer,
@@ -210,7 +225,11 @@ def make_quiz(payload: dict):
     topic = payload.get("topic") or None
     theme = payload.get("theme") or None
     n = int(payload.get("n") or 4)
-    q = quiz.generate_quiz(question_theme=theme, n=n, doc=doc, topic=topic)
+    try:
+        q = quiz.generate_quiz(question_theme=theme, n=n, doc=doc, topic=topic)
+    except RuntimeError as e:
+        # Model service down or unusable output — report honestly (503), not 404.
+        raise HTTPException(503, str(e))
     if q is None:
         raise HTTPException(404, "No matching course material for the given selection.")
     return q
