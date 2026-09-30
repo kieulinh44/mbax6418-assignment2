@@ -1,0 +1,362 @@
+[
+  {
+    "id": "q1",
+    "visual": false,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      1
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 2103.7,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q1",
+    "visual": false,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      1
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.2,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q1",
+    "visual": false,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      1
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 4.3,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q2",
+    "visual": false,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 12.6,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q2",
+    "visual": false,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q2",
+    "visual": false,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 3.6,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q3",
+    "visual": false,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 11.5,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q3",
+    "visual": false,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q3",
+    "visual": false,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 3.4,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q4",
+    "visual": false,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 10.8,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q4",
+    "visual": false,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q4",
+    "visual": false,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 3.5,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q5",
+    "visual": false,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 10.9,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q5",
+    "visual": false,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q5",
+    "visual": false,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 3.5,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q6",
+    "visual": true,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 10.5,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q6",
+    "visual": true,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q6",
+    "visual": true,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": true,
+    "precision_at_3": 0.3333333333333333,
+    "ms": 3.4,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q7",
+    "visual": true,
+    "unanswerable": false,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      1
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 10.6,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q7",
+    "visual": true,
+    "unanswerable": false,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q7",
+    "visual": true,
+    "unanswerable": false,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      1
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 3.5,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q8",
+    "visual": false,
+    "unanswerable": true,
+    "method": "hybrid",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 10.3,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q8",
+    "visual": false,
+    "unanswerable": true,
+    "method": "keyword",
+    "top1": [
+      "sample-lecture.pdf",
+      3
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 0.1,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  },
+  {
+    "id": "q8",
+    "visual": false,
+    "unanswerable": true,
+    "method": "vector",
+    "top1": [
+      "sample-lecture.pdf",
+      2
+    ],
+    "top1_hit": false,
+    "precision_at_3": null,
+    "ms": 3.4,
+    "answer_correct": "NEEDS_ENV",
+    "sources_support": "NEEDS_ENV"
+  }
+]

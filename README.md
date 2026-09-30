@@ -88,6 +88,24 @@ python scripts/scan_secrets.py         # fail if a real key/endpoint leaks
 `tests/test_remove_document_e2e.py` is expected to fail (xfail) until the
 remove-document feature from requirement 1a is implemented.
 
+## Evaluation (H1–H3)
+
+Question set (8: 5 text · 2 visual incl. the meme · 1 unanswerable) in
+`docs/evaluation/questions.json`; results + interpretation in
+`docs/results/evaluation.md`. Re-run with
+
+```bash
+python scripts/eval_retrieval.py
+```
+
+**Interpretation of the current run:** on the 3-page sample deck all
+approaches tie (identical top-1 hits, precision@3 capped at 1/3) — the sample
+is too small to separate keyword / vector / hybrid (RRF). The harness is the
+deliverable: rerun it on the real course deck, then fill the
+answer-correctness + source-support columns (they need `.env` + human
+judgment) and update this section. Hybrid adds ~100 ms/query warm (plus a
+one-time CLIP load) for the visual evidence it provides.
+
 ## Tested vs Unchecked (as of the debug branch)
 
 **Tested ✅** (offline, `pytest -q` → 12 passed, 1 xfailed; run on `mirina-debug`)

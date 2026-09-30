@@ -1,0 +1,63 @@
+{
+  "_comment": "Evaluation set for assignment H1-H3. 8 questions: 5 text on the sample deck, 2 visual (1 needs the real Week 2 deck for the meme), 1 unanswerable. relevant_pages = expected evidence (file, page).",
+  "queries": [
+    {
+      "id": "q1",
+      "query": "What is regularization and why is it used?",
+      "visual": false,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 1]]
+    },
+    {
+      "id": "q2",
+      "query": "How does L1 regularization (Lasso) behave differently from L2 (Ridge)?",
+      "visual": false,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 2]]
+    },
+    {
+      "id": "q3",
+      "query": "What does the lambda hyperparameter control in regularization?",
+      "visual": false,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 2]]
+    },
+    {
+      "id": "q4",
+      "query": "What happens when the learning rate is too large in gradient descent?",
+      "visual": false,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 3]]
+    },
+    {
+      "id": "q5",
+      "query": "In which direction does gradient descent update the model parameters?",
+      "visual": false,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 3]]
+    },
+    {
+      "id": "q6",
+      "query": "Describe what the diagram on the gradient-descent page shows about how the model parameters move.",
+      "visual": true,
+      "unanswerable": false,
+      "relevant_pages": [["sample-lecture.pdf", 3]]
+    },
+    {
+      "id": "q7",
+      "query": "Find the Vibe Coding on \"Prod\" meme in the Week 2 course slides and summarize what it shows.",
+      "visual": true,
+      "unanswerable": false,
+      "relevant_pages": [],
+      "_note": "NEEDS REAL DECK — requires the actual Week 2 slides in data/raw; scores as a miss on the sample deck on purpose."
+    },
+    {
+      "id": "q8",
+      "query": "What is the chemical structure of a phospholipid bilayer?",
+      "visual": false,
+      "unanswerable": true,
+      "relevant_pages": [],
+      "_note": "Out-of-scope: the app must acknowledge missing information, never invent."
+    }
+  ]
+}
