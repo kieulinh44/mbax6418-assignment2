@@ -72,7 +72,18 @@ query → run all three → reciprocal-rank fusion (rerank)
 - **Validation:** after generation, citations are checked against the retrieved evidence; the response carries separate `answer` and `sources` fields plus `validation.all_sources_supported`.
 
 ## Notes
-- Course material and the generated index are **gitignored** (public repo;
+* Course material and the generated index are **gitignored** (public repo;
   Canvas content may be copyrighted). Run ingest locally.
-- Model endpoints are OpenAI-compatible and configured in `app/config.py`
-  (override keys via env vars; defaults point at the class's local endpoints).
+* Model endpoints are OpenAI-compatible and configured via environment
+  variables. Copy `.env.example` to `.env`, fill in the real values the team
+  provides, and never commit `.env`. Without these variables the app starts
+  but model calls (ask/quiz) fail — see Setup.
+
+## Tests
+```bash
+pip install -r requirements-dev.txt   # pytest + httpx (test-only deps)
+pytest -q                              # fast, offline unit + API tests
+python scripts/scan_secrets.py         # fail if a real key/endpoint leaks
+```
+`tests/test_remove_document_e2e.py` is expected to fail (xfail) until the
+remove-document feature from requirement 1a is implemented.
