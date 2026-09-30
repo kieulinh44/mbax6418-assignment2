@@ -87,3 +87,30 @@ python scripts/scan_secrets.py         # fail if a real key/endpoint leaks
 ```
 `tests/test_remove_document_e2e.py` is expected to fail (xfail) until the
 remove-document feature from requirement 1a is implemented.
+
+## Tested vs Unchecked (as of the debug branch)
+
+**Tested ✅** (offline, `pytest -q` → 12 passed, 1 xfailed; run on `mirina-debug`)
+- Security config: no committed keys/endpoints; env-only resolution with dummy
+  examples (`tests/test_config_secrets.py`)
+- Quiz answer key + explanations never sent to the client; grading + reveal
+  (`tests/test_quiz_key_hiding.py`)
+- Source validation behaviour pinned (`tests/test_validate_sources.py`)
+- Unavailable model services: ask degrades gracefully with evidence
+  (`service_unavailable`), quiz returns a clear 503 instead of a misleading 404
+  (`tests/test_unavailable_services.py`)
+- Secrets-leak scan over all tracked files (`python scripts/scan_secrets.py`)
+
+**Unchecked / blocked ⚠️** (see `docs/MANUAL_QA.md` for the full checklist)
+- Remove-document feature (requirement 1a) — not implemented; pinned by an
+  xfail acceptance test, awaiting implementation.
+- Manual QA on real materials: the "Vibe Coding on Prod" meme test (needs the
+  actual Week 2 slides), source-vs-original-slide checks.
+- Full end-to-end run against the class model endpoints (ask/quiz with real
+  chat + vision services) — the automated suite is offline/stubbed by design.
+- Dedup is by filename slug only, not content hash (rename ⇒ duplicate).
+- Dark mode — not implemented (requirement is conditional: "if available").
+- Screenshot content never visually verified against the running app.
+- Evaluation deliverable (5-10 question set, two-approach RAG comparison with
+  time + answer correctness + source support) and the SVG architecture diagram
+  are still outstanding.
