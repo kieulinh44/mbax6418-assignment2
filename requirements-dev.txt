@@ -1,0 +1,5 @@
+# Test-only dependencies (fast, offline unit + API tests).
+# The heavy runtime stack (sentence-transformers, chromadb, bm25s, ...) is in
+# requirements.txt and only needed to build/serve real indexes.
+pytest>=8.0
+httpx>=0.27

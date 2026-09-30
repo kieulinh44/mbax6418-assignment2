@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, mirina-debug]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test deps (fast, offline)
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Offline unit + API tests
+        # test_remove_document_e2e is xfail (strict) until 1a remove feature lands.
+        run: pytest -q
+
+      - name: Secrets scan
+        run: python scripts/scan_secrets.py
+
+  # Heavy stack (sentence-transformers/chromadb/bm25s) intentionally not
+  # installed here — full index builds run locally. Add a separate job when
+  # the team wants model-level integration tests.

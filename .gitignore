@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
 
 # Course materials & generated index — NOT committed (public repo; may be copyrighted)
 data/raw/
