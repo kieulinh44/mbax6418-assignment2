@@ -144,19 +144,6 @@ def lexical_match_score(query, text):
     return score
 
 
-def content_depth_factor(text):
-    """Downweight title-only and table-of-contents chunks without removing them."""
-    lowered = text.lower()
-    word_count = len(re.findall(r"[a-z0-9]+", lowered))
-    if word_count <= 6:
-        return 0.15
-    if "topics" in lowered and word_count <= 30:
-        return 0.25
-    if word_count <= 12:
-        return 0.45
-    return 1.0
-
-
 def _is_image_query(query):
     q = query.lower()
     return any(w in q for w in _IMAGE_QUERY_WORDS)
@@ -534,10 +521,6 @@ class Corpus:
 
         if not fused:
             return []
-        for cid in list(fused):
-            i = cid_to_i.get(cid)
-            if i is not None:
-                fused[cid] *= content_depth_factor(self.chunks[i]["text"])
         ordered = sorted(fused, key=fused.get, reverse=True)
 
         # collapse to pages (best chunk per page), ordered by fused score

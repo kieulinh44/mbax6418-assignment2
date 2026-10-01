@@ -11,15 +11,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import requests
 
+# When invoked as ``python scripts/compare_retrieval.py``, Python puts the
+# scripts directory—not the repository root—on sys.path.
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from scripts.eval_questions import QUESTIONS
 
-ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "evaluation_results.json"
 MODES = ("hybrid", "text_keyword_only")
 
@@ -30,6 +35,10 @@ def _is_missing_acknowledged(answer: str, category: str) -> bool:
     answer = answer.lower()
     return any(marker in answer for marker in (
         "not in the materials", "information is missing", "do not contain", "not provided",
+        "not mentioned anywhere", "not mentioned", "does not mention", "no information",
+        "not found in the materials", "not stated anywhere", "not stated",
+        "not available in the provided materials", "not present in the materials",
+        "does not appear in the materials", "no evidence in the materials",
     ))
 
 

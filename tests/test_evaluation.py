@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from app import main
-from app.hybrid import Corpus, content_depth_factor, lexical_match_score, normalize_retrieval_mode
+from app.hybrid import Corpus, lexical_match_score, normalize_retrieval_mode
 from scripts.compare_retrieval import MODES, QUESTIONS, run_one
 
 
@@ -28,6 +28,18 @@ class FakeSession:
         })
 
 
+class FakeSessionWithAnswer:
+    def __init__(self, answer):
+        self.answer = answer
+
+    def post(self, url, json, timeout):
+        return FakeResponse({
+            "answer": self.answer,
+            "sources": [],
+            "validation": {"all_sources_supported": True},
+        })
+
+
 def test_retrieval_modes_are_validated_and_defaulted():
     assert normalize_retrieval_mode(None) == "hybrid"
     assert normalize_retrieval_mode("text_keyword_only") == "text_keyword_only"
@@ -43,10 +55,33 @@ def test_grading_terms_receive_an_exact_text_match_boost():
     assert score >= 5
 
 
-def test_title_only_slide_is_downweighted_against_substantive_content():
-    assert content_depth_factor("Vibe Coding Overview") < content_depth_factor(
-        "Vibe coding uses conversational prompts to explore and refine ideas with a model."
+def test_citation_validation_requires_exact_filename_and_page():
+    hits = [{"page": {"file": "Week 2 Slides.pptx", "page": 33}}]
+    supported = main._validate("The meme is shown here [Week 2 Slides.pptx p.33].", hits)
+    bullet_supported = main._validate("- Week 2 Slides.pptx p.33 — meme evidence.", hits)
+    unsupported = main._validate("The meme is shown here [Week 2 Slides.pptx].", hits)
+    assert supported["all_sources_supported"] is True
+    assert bullet_supported["all_sources_supported"] is True
+    assert unsupported["all_sources_supported"] is False
+
+
+def test_validation_allows_retrieved_but_uncited_candidates():
+    hits = [
+        {"page": {"file": "slides.pptx", "page": 10}},
+        {"page": {"file": "slides.pptx", "page": 11}},
+    ]
+    result = main._validate("Answer supported by [slides.pptx p.10].", hits)
+    assert result["all_sources_supported"] is True
+    assert result["sources_not_cited"] == [{"file": "slides.pptx", "page": 11}]
+
+
+def test_missing_information_detector_accepts_not_mentioned_anywhere():
+    category, question = QUESTIONS[-1]
+    row = run_one(
+        FakeSessionWithAnswer("This is not mentioned anywhere in the materials."),
+        "http://example.test", 9, category, question, MODES[0]
     )
+    assert row["acknowledges_missing_information"] is True
 
 
 def test_empty_retrieval_results_do_not_raise_index_error():
@@ -104,6 +139,15 @@ def test_evaluator_row_contains_timing_sources_validation_and_manual_fields():
     assert row["acknowledges_missing_information"] is True
     assert row["correct_manual_review"] is None
     assert row["sources_supported_manual_review"] is None
+
+
+def test_missing_information_detector_accepts_not_stated_anywhere():
+    category, question = QUESTIONS[-1]
+    row = run_one(
+        FakeSessionWithAnswer("The preference is not stated anywhere in the supplied course evidence."),
+        "http://example.test", 9, category, question, MODES[0]
+    )
+    assert row["acknowledges_missing_information"] is True
 
 
 def test_canonical_evaluation_set_has_nine_questions():
