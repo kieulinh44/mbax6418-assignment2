@@ -1,10 +1,20 @@
 """Browser regression tests. Run with .venv/bin/python -m unittest discover -s tests -v.
 Requires the local app on port 8000 and playwright (dev dependency).
+
+Skipped (not failed) when playwright isn't installed, so plain `pytest -q`
+collection always works — including CI with only the light test deps.
 """
 import unittest
-from playwright.sync_api import sync_playwright
+
+try:
+    from playwright.sync_api import sync_playwright
+    _NO_PLAYWRIGHT = None
+except ImportError:  # pragma: no cover
+    sync_playwright = None
+    _NO_PLAYWRIGHT = "playwright not installed (pip install playwright && playwright install chromium)"
 
 
+@unittest.skipIf(_NO_PLAYWRIGHT is not None, _NO_PLAYWRIGHT)
 class DashboardTests(unittest.TestCase):
     def setUp(self):
         self.pw = sync_playwright().start()
