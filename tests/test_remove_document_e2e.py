@@ -1,37 +1,52 @@
 """E2E test for requirement 1a: remove documents through the app.
 
-Expected to FAIL (xfail) until the delete endpoint + index purge exist.
-The feature is missing on `main` and `mirina-debug`; this test pins the
-acceptance criteria so whoever implements it can iterate against it:
-  - deleting a document returns 2xx
-  - the document disappears from /api/files afterwards
+DELETE /api/documents/{doc} where `doc` is the document SLUG (as reported by
+/api/files — e.g. "scratch-remove-me", not "scratch-remove-me.md"). Removing
+must purge the file from /api/files AND /api/materials and the index.
 """
+import uuid
+
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
+# This test drives real upload+indexing, which needs the heavy model stack.
+# Skip (not fail) where only the light test deps are installed (CI).
+pytest.importorskip("sentence_transformers")
+pytest.importorskip("chromadb")
+pytest.importorskip("bm25s")
 
-pytestmark = pytest.mark.xfail(
-    strict=True,
-    reason="remove-document feature (assignment 1a) not implemented yet",
-)
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+
+client = TestClient(app)
+
+
+def _unique_md_name():
+    return f"scratch-remove-{uuid.uuid4().hex[:8]}.md"
 
 
 def test_remove_document_via_api():
-    client = TestClient(app)
-    # upload a tiny text file first, then remove it
+    fname = _unique_md_name()
     up = client.post("/api/upload",
-                     files=[("files", ("scratch-remove-me.md",
-                                        b"# Remove me\n\nSCRATCH_REMOVE_TOKEN_4491.",
-                                        "text/markdown"))])
+                     files=[("files", (fname,
+                                       b"# Remove me\n\nSCRATCH_REMOVE_TOKEN_4491.",
+                                       "text/markdown"))])
     assert up.status_code in (200, 201), up.text
 
     listed = client.get("/api/files").json()["documents"]
-    assert any("scratch-remove-me" in d["doc"] for d in listed)
+    mine = [d for d in listed if d["doc"] == fname.replace(".md", "")]
+    assert mine, f"uploaded doc not listed: {listed}"
 
-    resp = client.delete("/api/documents/scratch-remove-me.md")
+    resp = client.delete(f"/api/documents/{mine[0]['doc']}")
     assert resp.status_code in (200, 204), resp.text
 
     after = client.get("/api/files").json()["documents"]
-    assert not any("scratch-remove-me" in d["doc"] for d in after), \
+    assert not any(d["doc"] == mine[0]["doc"] for d in after), \
         "removed document still listed after deletion"
+
+    mats = client.get("/api/materials").json()["materials"]
+    assert not any(m["file"] == fname for m in mats), \
+        "removed source file still downloadable"
+
+    second = client.delete(f"/api/documents/{mine[0]['doc']}")
+    assert second.status_code == 404, "deleting an unknown doc must 404"

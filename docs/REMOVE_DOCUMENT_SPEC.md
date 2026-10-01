@@ -1,7 +1,9 @@
-# Remove-Document Feature — Implementation Spec (requirement 1a)
+# Remove-Document Feature — Verified ✅ (implemented on main, e2e-tested)
 
-**Status:** PENDING — not implemented. Acceptance test exists (expected-fail):
-`tests/test_remove_document_e2e.py` — make it pass and the feature is done.
+**Status:** IMPLEMENTED and verified via `tests/test_remove_document_e2e.py`
+(real-stack run: upload → DELETE by doc slug → gone from /api/files and
+/api/materials → 404 on re-delete). Kept as the reference for how the feature
+is supposed to behave.
 
 ## Why
 

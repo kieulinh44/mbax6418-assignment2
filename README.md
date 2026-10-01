@@ -142,7 +142,10 @@ one-time CLIP load) for the visual evidence it provides.
 
 ## Tested vs Unchecked (as of the debug branch)
 
-**Tested ✅** (offline, `pytest -q` → 12 passed, 1 xfailed; run on `mirina-debug`)
+**Tested ✅**
+- Remove + re-add documents through the app, end-to-end: upload → delete by
+  doc slug → gone from `/api/files` and `/api/materials` → 404 on re-delete
+  (`tests/test_remove_document_e2e.py`, full model stack)
 - Security config: no committed keys/endpoints; env-only resolution with dummy
   examples (`tests/test_config_secrets.py`)
 - Quiz answer key + explanations never sent to the client; grading + reveal
@@ -152,10 +155,12 @@ one-time CLIP load) for the visual evidence it provides.
   (`service_unavailable`), quiz returns a clear 503 instead of a misleading 404
   (`tests/test_unavailable_services.py`)
 - Secrets-leak scan over all tracked files (`python scripts/scan_secrets.py`)
+- Offline suite on the light test deps: `pytest -q` → 12 passed, 1 skipped
+  (the remove-doc e2e needs the full stack; runs green there too)
 
 **Unchecked / blocked ⚠️** (see `docs/MANUAL_QA.md` for the full checklist)
-- Remove-document feature (requirement 1a) — not implemented; pinned by an
-  xfail acceptance test, awaiting implementation.
+- Remove-document **UI button** click-through — API path is verified
+  end-to-end; the in-browser flow is a manual QA item.
 - Manual QA on real materials: the "Vibe Coding on Prod" meme test (needs the
   actual Week 2 slides), source-vs-original-slide checks.
 - Full end-to-end run against the class model endpoints (ask/quiz with real
