@@ -17,7 +17,7 @@
     <rect x="20" y="66" width="13" height="13" rx="3" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
     <text x="38" y="77" fill="#24292f">Runs locally on this machine</text>
     <rect x="240" y="66" width="13" height="13" rx="3" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
-    <text x="258" y="77" fill="#24292f">Class service endpoints (dobolyi.com:9000 / 9001 — OpenAI-compatible)</text>
+    <text x="258" y="77" fill="#24292f">Class service endpoints (ports 9000 / 9001 — OpenAI-compatible)</text>
   </g>
 
   <!-- ============ Row 1: document preparation (local) ============ -->
@@ -89,13 +89,13 @@
     <line x1="500" y1="516" x2="740" y2="560" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arrB)"/>
 
     <rect x="40" y="562" width="470" height="86" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
-    <text x="50" y="584" font-size="12.5" font-weight="700" fill="#cf222e">👁 Vision pass — Qwen (dobolyi.com:9001)</text>
+    <text x="50" y="584" font-size="12.5" font-weight="700" fill="#cf222e">👁 Vision pass — Qwen vision (class endpoint :9001)</text>
     <text x="50" y="602" font-size="11" fill="#24292f">describes diagrams / charts / memes in the images</text>
     <text x="50" y="618" font-size="11" fill="#57606a">base64 images sent in the request; failure ⇒ notes dropped</text>
     <text x="50" y="634" font-size="11" fill="#57606a">(needs DOBOLYI_VISION_* env values)</text>
 
     <rect x="560" y="562" width="520" height="86" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
-    <text x="570" y="584" font-size="12.5" font-weight="700" fill="#cf222e">🧠 Grounded answer — DeepSeek chat (dobolyi.com:9000)</text>
+    <text x="570" y="584" font-size="12.5" font-weight="700" fill="#cf222e">🧠 Grounded answer — DeepSeek chat (class endpoint :9000)</text>
     <text x="570" y="602" font-size="11" fill="#24292f">answer ONLY from the retrieved material · never invent</text>
     <text x="570" y="618" font-size="11" fill="#24292f">→ structured {answer, sources, validation}</text>
     <text x="570" y="634" font-size="11" fill="#57606a">sources checked against evidence (file-name citation check)</text>

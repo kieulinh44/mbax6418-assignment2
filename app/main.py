@@ -9,7 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from . import config, llm, quiz, hybrid
 
 app = FastAPI(title="Course Assistant")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware,
+                   allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+                   allow_methods=["*"], allow_headers=["*"])
 
 # Serve page images (rendered copies) and the front-end
 os.makedirs(os.path.join(config.DATA_INDEX, "pages"), exist_ok=True)
@@ -75,24 +77,50 @@ def download_material(fname: str):
 async def upload_materials(files: list[UploadFile] = File(...)):
     """Upload course materials from the dashboard; ingests + indexes them."""
     from . import ingest as ingest_mod
+    # Reject duplicates BEFORE touching disk so an existing source is never
+    # overwritten by a rejected upload.
+    existing_docs = {p["doc"] for p in hybrid.load_pages()}
     saved = []
+    MAX_BYTES = 250 * 1024 * 1024  # per-file cap
     os.makedirs(config.DATA_RAW, exist_ok=True)
-    for up in files:
-        fname = os.path.basename(up.filename or "").replace("\\", "/").split("/")[-1]
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in ingest_mod.SUPPORTED_EXTS:
-            raise HTTPException(400, f"Unsupported format '{ext or '(none)'}'. "
-                                     f"Accepted: {', '.join(sorted(ingest_mod.SUPPORTED_EXTS))}")
-        dest = os.path.join(config.DATA_RAW, fname)
-        with open(dest, "wb") as out:
-            out.write(await up.read())
-        saved.append(dest)
     try:
+        for up in files:
+            fname = os.path.basename(up.filename or "").replace("\\", "/").split("/")[-1]
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in ingest_mod.SUPPORTED_EXTS:
+                raise HTTPException(400, f"Unsupported format '{ext or '(none)'}'. "
+                                         f"Accepted: {', '.join(sorted(ingest_mod.SUPPORTED_EXTS))}")
+            if ingest_mod._slug(fname) in existing_docs:
+                raise HTTPException(409, f"'{fname}' is already indexed "
+                                         "(rename the file to add it as a new document).")
+            dest = os.path.join(config.DATA_RAW, fname)
+            data = await up.read()
+            if len(data) > MAX_BYTES:
+                raise HTTPException(413, f"'{fname}' exceeds the {MAX_BYTES // (1024 * 1024)} MB upload limit.")
+            with open(dest, "wb") as out:
+                out.write(data)
+            saved.append(dest)
         result = hybrid.get_corpus().ingest_and_index(saved)
-    except ValueError as e:
-        raise HTTPException(409, str(e))
+        return {"ok": True, "result": result}
+    except HTTPException:
+        raise
     except Exception as e:
+        # never orphan a partially-uploaded file
+        for p in saved:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
         raise HTTPException(500, f"Indexing failed: {e}")
+
+
+@app.delete("/api/documents/{doc}")
+def remove_document(doc: str):
+    """Remove a document and all of its searchable content (pages, chunks,
+    embeddings, images, and the source file)."""
+    result = hybrid.get_corpus().remove_document(doc)
+    if result is None:
+        raise HTTPException(404, f"Document '{doc}' not found in the index.")
     return {"ok": True, "result": result}
 
 
@@ -156,10 +184,11 @@ def ask(payload: dict):
         )
     context = "\n\n".join(context_blocks)
 
-    # Vision pass over the images of the top retrieved pages (diagrams/charts)
+    # Vision pass over the images of the top retrieved pages (diagrams/charts).
+    # Sources below always carry the original slide image + doc name + slide number.
     vision_notes = ""
     img_paths = []
-    for h in hits[:2]:
+    for h in hits[:3]:
         if h["page"].get("image"):
             ip = os.path.join(config.DATA_INDEX, h["page"]["image"])
             if os.path.exists(ip):
@@ -224,7 +253,10 @@ def make_quiz(payload: dict):
     doc = payload.get("doc") or None
     topic = payload.get("topic") or None
     theme = payload.get("theme") or None
-    n = int(payload.get("n") or 4)
+    try:
+        n = int(payload.get("n") or 4)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "n must be a number (2–6).")
     try:
         q = quiz.generate_quiz(question_theme=theme, n=n, doc=doc, topic=topic)
     except RuntimeError as e:
