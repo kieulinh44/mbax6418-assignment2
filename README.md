@@ -67,12 +67,21 @@ Its attributed observations are passed to the answer model as course evidence,
 including information missing from extracted text. For retrieved PowerPoint slides,
 the vision pass uses up to three native-resolution embedded pictures from
 that exact slide, cropped to the visible picture area; tiny logos are omitted.
-These replace their downsized duplicates during image analysis to preserve small
-chart labels. Slides without usable raster details use the full-slide render;
-the displayed evidence remains the actual full slide in either case.
+The full-slide render is analyzed first to preserve layout and spatial context;
+the native details then improve small-label legibility. Slides without usable
+raster details use the full-slide render alone. The displayed evidence remains
+the actual full slide in either case.
+Retrieval remains broad enough to compare candidate evidence internally, but the
+dashboard gallery shows only sources cited by the validated answer. A singular
+visual-locator request such as “Find the meme about Vibe Coding on \"Prod\"”
+shows only the highest-ranked supporting slide; comparison questions can still
+show multiple cited slides.
 Failed image analysis or missing renders produce explicit limitations instead of
 unsupported visual claims. Internal reasoning and truncated model completions
-are never presented as finished answers.
+are never presented as finished answers. Before display, a separate deterministic
+grounding review revises unsupported claims or rejects the draft if validation
+cannot complete. Visual answers separate direct observations from interpretation,
+and exact labels or values are allowed only when the evidence marks them legible.
 The API returns `vision_sources` and `visual_warnings` alongside `answer`,
 `sources` (with `kind`, `label`, and an existing image URL), and `vision_notes`.
 
@@ -172,7 +181,7 @@ query → run all three → weighted score fusion (rerank)
 - **Keyword:** `bm25s`; **text vectors:** `chromadb` collection with all-MiniLM; **visual vectors:** `chromadb` collection with CLIP `clip-ViT-B-32` over every page image, queried cross-modally by the text question.
 - **Combine/rerank:** weighted score fusion — per-stage min-max normalization of BM25, text-cosine, and visual-cosine scores, summed with weights (visual boosts surfaced pages for text questions; visual leads when the question is explicitly about an image/diagram/meme).
 - **Add/remove:** the dashboard supports upload (incremental indexing) and removal (purges the document's pages, chunks, embeddings, and images); duplicate uploads are refused.
-- **Validation:** after generation, citations are checked against the retrieved evidence; the response carries separate `answer` and `sources` fields plus `validation.all_sources_supported`.
+- **Validation:** after generation, a second evidence-only pass revises or rejects unsupported claims, and citations must match both the retrieved filename and exact page/slide number. The response carries separate `answer` and `sources` fields plus `validation.all_sources_supported` and `validation.grounding_review`.
 
 ## Notes
 - Course material and the generated index are **gitignored** (public repo;

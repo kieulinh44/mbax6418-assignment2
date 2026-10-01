@@ -22,6 +22,12 @@ class ModelCompletionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'final answer'):
                 llm.chat([])
 
+    def test_grounding_review_uses_deterministic_temperature(self):
+        with patch.object(llm.requests, 'post',
+                          return_value=self.response('Validated answer.')) as post:
+            self.assertEqual(llm.ground([]), 'Validated answer.')
+            self.assertEqual(post.call_args.kwargs['json']['temperature'], 0.0)
+
     def test_internal_reasoning_is_never_a_final_answer(self):
         with patch.object(llm.requests,'post',return_value=self.response(None,'We need to analyze the slide.',finish='length')):
             with self.assertRaisesRegex(RuntimeError,'final answer'):

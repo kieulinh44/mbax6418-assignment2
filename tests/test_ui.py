@@ -45,7 +45,8 @@ class DashboardTests(unittest.TestCase):
 
     def test_retrieved_slide_image_has_caption_and_explain_control(self):
         self.page.route('**/api/ask', lambda route: route.fulfill(json={
-            'answer': 'Browser test fixture answer.',
+            'answer': ('**Direct observations**\n- Visible course evidence.\n\n'
+                       '**Interpretation**\n- Evidence-based meaning.'),
             'sources': [{'doc': 'sample-lecture', 'file': 'lecture.pptx', 'kind': 'pptx',
                          'page': 2, 'label': 'Slide 2', 'excerpt': 'Evidence excerpt',
                          'image': '/pages/sample-lecture_p002.png'}],
@@ -54,6 +55,13 @@ class DashboardTests(unittest.TestCase):
         self.page.locator('#q').fill('Explain the diagram in these slides.')
         self.page.locator('#askBtn').click()
         self.page.locator('#sources figure').wait_for()
+        sections = self.page.locator('#answer .answer-section')
+        self.assertEqual(sections.count(), 2)
+        self.assertEqual(sections.nth(0).locator('h3').inner_text(),
+                         '✓Direct observations')
+        self.assertEqual(sections.nth(1).locator('h3').inner_text(),
+                         '◇Interpretation')
+        self.assertNotIn('**', self.page.locator('#answer').inner_text())
         self.assertIn('lecture.pptx', self.page.locator('#sources figcaption').inner_text())
         self.assertIn('Slide 2', self.page.locator('#sources figcaption').inner_text())
         image=self.page.locator('#sources img')
@@ -71,6 +79,33 @@ class DashboardTests(unittest.TestCase):
             self.page.goto(f'http://127.0.0.1:8000/?tab={tab}')
             self.assertEqual(self.page.locator('.tab.active').get_attribute('data-tab'), tab)
             self.assertTrue(self.page.locator(f'#panel-{tab}').is_visible())
+
+    def test_visual_heading_and_list_variations_use_consistent_sections(self):
+        self.page.route('**/api/ask', lambda route: route.fulfill(json={
+            'answer': ('### **DIRECT OBSERVATIONS:**\n'
+                       '1. First visible point\n'
+                       '   - Nested visible detail\n\n'
+                       '**Interpetation:**\n'
+                       '- Evidence-based meaning\n\n'
+                       '**Source:**\n- lecture.pptx p.5'),
+            'sources': [], 'visual_warnings': []
+        }))
+        self.page.locator('#q').fill('Find the training data slide.')
+        self.page.locator('#askBtn').click()
+        self.page.locator('#answer .answer-section').first.wait_for()
+        sections = self.page.locator('#answer .answer-section')
+        self.assertEqual(sections.count(), 3)
+        self.assertEqual(sections.nth(0).get_attribute('class'),
+                         'answer-section observation')
+        self.assertEqual(sections.nth(0).locator('h3').inner_text(),
+                         '✓Direct observations')
+        self.assertEqual(sections.nth(1).get_attribute('class'),
+                         'answer-section interpretation')
+        self.assertEqual(sections.nth(1).locator('h3').inner_text(),
+                         '◇Interpretation')
+        self.assertEqual(sections.nth(0).locator('ol').count(), 1)
+        self.assertEqual(sections.nth(0).locator('ol ul').count(), 1)
+        self.assertNotIn('**', self.page.locator('#answer').inner_text())
 
     def test_check_answers_submits_selected_answers(self):
         payloads = []
