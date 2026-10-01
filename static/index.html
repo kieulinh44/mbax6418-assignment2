@@ -3,18 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Course Assistant</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f8f3ea;--card:#fffdf8;--border:#ded3cd;--text:#302635;--muted:#70616e;--accent:#613956;--accent-hover:#47243f;--coral:#bd573e;--soft:#f1e6ef;--good:#30705d;--bad:#a63b44;--serif:"DM Serif Display",Georgia,serif;--sans:"DM Sans",system-ui,sans-serif}
+/* ---- Light (default) ---- */
+:root{
+  color-scheme:light;
+  --bg:#f8f3ea;--card:#fffdf8;--border:#ded3cd;--text:#302635;--muted:#70616e;
+  --accent:#613956;--accent-hover:#47243f;--coral:#bd573e;--soft:#f1e6ef;
+  --good:#30705d;--bad:#a63b44;--good-bg:#edf5ef;--bad-bg:#faeeec;--code-bg:#f3ece7;
+  --serif:"DM Serif Display",Georgia,serif;--sans:"DM Sans",system-ui,sans-serif;
+}
+/* ---- Dark (explicit choice) ---- */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#1a141c;--card:#261d2b;--border:#4a3d52;--text:#f3eaf4;--muted:#c0b1c6;
+  --accent:#d9a7c4;--accent-hover:#c08da9;--coral:#e89471;--soft:#382b3e;
+  --good:#7fd0a8;--bad:#ef8f97;--good-bg:#1e3a2d;--bad-bg:#43262b;--code-bg:#2c2331;
+}
+/* ---- Dark (system preference, unless overridden by the toggle) ---- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#1a141c;--card:#261d2b;--border:#4a3d52;--text:#f3eaf4;--muted:#c0b1c6;
+    --accent:#d9a7c4;--accent-hover:#c08da9;--coral:#e89471;--soft:#382b3e;
+    --good:#7fd0a8;--bad:#ef8f97;--good-bg:#1e3a2d;--bad-bg:#43262b;--code-bg:#2c2331;
+  }
+}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6}
 header{border-bottom:1px solid var(--border);background:var(--card);padding:34px max(24px,calc((100vw - 1040px)/2)) 0;position:relative;overflow:hidden}
 header::after{content:"✳";position:absolute;right:max(24px,calc((100vw - 1040px)/2));top:26px;font-size:92px;line-height:1;color:var(--coral);transform:rotate(-12deg);pointer-events:none}
 .eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--coral);margin:0 0 10px}
+.theme-toggle{position:absolute;top:14px;right:max(24px,calc((100vw - 1040px)/2));margin:0;padding:8px 13px;font-size:15px;line-height:1;border-radius:999px;background:transparent;color:var(--accent);border:1px solid var(--border)}
+.theme-toggle:hover{background:var(--soft);border-color:var(--accent);box-shadow:none}
 header h1{font-family:var(--serif);font-weight:400;font-size:clamp(34px,5vw,54px);letter-spacing:-.025em;line-height:1.12;margin:0 110px 12px 0}
 header p{margin:0 0 8px;color:var(--muted);max-width:790px}
 header .contributors{font-size:12px;line-height:1.65;max-width:730px;margin-top:12px;padding-right:24px}
@@ -32,7 +58,7 @@ main{max-width:1088px;margin:0 auto;padding:32px 24px 56px}
 .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}
 .panel-heading h2{font:400 32px/1.2 var(--serif);margin:0 0 8px;letter-spacing:-.02em}
 .panel-heading p{margin:0;color:var(--muted);max-width:650px}
-.step{font:400 54px/1 var(--serif);color:#ab8d9e;flex-shrink:0}
+.step{font:400 54px/1 var(--serif);color:var(--muted);flex-shrink:0}
 .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:22px;box-shadow:0 4px 16px #38233404}
 .card h3{font:400 24px/1.3 var(--serif);margin:0 0 8px}
 label{font-size:13px;font-weight:600;display:block;margin:14px 0 7px}
@@ -42,7 +68,7 @@ textarea{min-height:140px;resize:vertical;margin-top:16px}
 ::placeholder{color:var(--muted);opacity:.9}
 .row{display:flex;gap:16px;align-items:flex-end}
 .row>div{flex:1;min-width:0}
-.upload-zone{margin-top:22px;border:1px dashed #b399ab;border-radius:14px;background:#f8f1f5;padding:22px}
+.upload-zone{margin-top:22px;border:1px dashed var(--border);border-radius:14px;background:var(--soft);padding:22px}
 .upload-zone label{margin-top:0}
 input[type=file]{max-width:100%;font:13px var(--sans);color:var(--muted)}
 input[type=file]::file-selector-button{font:600 13px var(--sans);border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--accent);padding:10px 14px;margin-right:12px;cursor:pointer}
@@ -56,29 +82,29 @@ input[type=file]::file-selector-button{font:600 13px var(--sans);border:1px soli
 .material-info strong{display:block;color:var(--text);font-weight:600}
 .material-info small{display:block;color:var(--muted);font-size:12px}
 .rbtn{margin:0;background:transparent;border:1px solid var(--border);padding:9px 13px;font-size:12px;color:var(--bad);flex-shrink:0}
-.rbtn:hover{border-color:var(--bad);background:#faeeec;box-shadow:none}
+.rbtn:hover{border-color:var(--bad);background:var(--bad-bg);box-shadow:none}
 .muted{color:var(--muted);font-size:13px}
 .tag{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;padding:4px 12px;font-size:12px;margin:0 4px 4px 0}
 .cite{border:1px solid var(--border);border-radius:16px;padding:22px;margin:16px 0}
 .cite .meta{font-size:12px;color:var(--muted);margin-bottom:10px}
-pre{font:400 13px/1.7 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere;background:#f3ece7;border-radius:10px;padding:14px;max-height:200px;overflow:auto;color:var(--text)}
-.cite img,.source img{max-width:100%;border-radius:12px;border:1px solid var(--border);margin-top:12px}
+pre{font:400 13px/1.7 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code-bg);border-radius:10px;padding:14px;max-height:200px;overflow:auto;color:var(--text)}
+.cite img,.source img{max-width:100%;border-radius:12px;border:1px solid var(--border);margin-top:12px;background:#fff}
 .answer{white-space:pre-wrap;line-height:1.85;font-size:15px;border-top:3px solid var(--coral)}
 .question{border:1px solid var(--border);border-radius:14px;padding:20px;margin:20px 0}
 .question h3{font:600 16px/1.6 var(--sans);margin:0 0 14px}
 .opt{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin:8px 0;cursor:pointer;font-size:14px;font-weight:400}
 .opt:hover{background:var(--soft)}
 .opt input{margin-top:5px;accent-color:var(--accent)}
-.opt.good{border-color:var(--good);background:#edf5ef}
-.opt.bad{border-color:var(--bad);background:#faeeec}
+.opt.good{border-color:var(--good);background:var(--good-bg);color:var(--text)}
+.opt.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--text)}
 .opt .letter{font-weight:700;color:var(--muted);min-width:18px}
 .score{font:400 26px/1.4 var(--serif);color:var(--accent);margin:12px 0}
-.expl{font-size:14px;background:#f3ece7;border-left:3px solid var(--coral);padding:12px 16px;border-radius:0 10px 10px 0;margin-top:10px}
+.expl{font-size:14px;background:var(--code-bg);border-left:3px solid var(--coral);padding:12px 16px;border-radius:0 10px 10px 0;margin-top:10px;color:var(--text)}
 details.source{margin-top:12px}
 details.source summary{font-size:12px;color:var(--muted);cursor:pointer}
 .sel{display:inline-flex;align-items:center;gap:8px;margin-top:12px}
 footer{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:20px;margin-top:30px;display:flex;gap:12px;justify-content:space-between}
-@media(max-width:600px){header{padding:26px 20px 0}header::after{font-size:56px;right:20px;top:32px}header h1{margin-right:65px}header .contributors{padding:0}.tabs{gap:4px}.tab{padding:9px 14px;font-size:13px}main{padding:24px 16px 36px}.card{padding:20px;border-radius:16px}.row{flex-direction:column;align-items:stretch;gap:6px}.row>div{max-width:none!important}.row button{width:100%;margin-top:10px}.upload-zone{padding:16px}.panel-heading h2{font-size:28px}.step{font-size:42px}.material-row{gap:8px}.mat{width:100%}footer{flex-direction:column;gap:4px}}
+@media(max-width:600px){header{padding:26px 20px 0}header::after{font-size:56px;right:20px;top:32px}header h1{margin-right:65px}header .contributors{padding:0}.theme-toggle{top:12px;right:20px}.tabs{gap:4px}.tab{padding:9px 14px;font-size:13px}main{padding:24px 16px 36px}.card{padding:20px;border-radius:16px}.row{flex-direction:column;align-items:stretch;gap:6px}.row>div{max-width:none!important}.row button{width:100%;margin-top:10px}.upload-zone{padding:16px}.panel-heading h2{font-size:28px}.step{font-size:42px}.material-row{gap:8px}.mat{width:100%}footer{flex-direction:column;gap:4px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -88,6 +114,7 @@ footer{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padd
   <h1>Course Assistant</h1>
   <p>A little curiosity. A lot of clarity. Learn from your course materials.</p>
   <p class="contributors">Contributed by Linh Nguyen, Jamie Lin, Kelly Nguyen, Jana Chittarath, and Mirina Gurung</p>
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark / light mode">🌙</button>
   <nav class="tabs" role="tablist" aria-label="Study tools">
     <button class="tab active" data-tab="qa">Q&amp;A</button>
     <button class="tab" data-tab="quiz">Practice Quiz</button>
@@ -336,6 +363,21 @@ refreshFiles();
 // allow deep-linking to a tab, e.g. ?tab=quiz (used for screenshots/docs)
 const _tabParam = new URLSearchParams(location.search).get('tab');
 if(['qa','quiz','materials'].includes(_tabParam)) switchTab(_tabParam);
+
+/* ---------- dark / light mode ---------- */
+const themeBtn=$('themeToggle');
+const sysDark=matchMedia('(prefers-color-scheme: dark)');
+function currentTheme(){ return localStorage.getItem('theme') || (sysDark.matches?'dark':'light'); }
+function paintThemeIcon(){ themeBtn.textContent = currentTheme()==='dark'?'☀️':'🌙'; }
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  localStorage.setItem('theme',t);
+  paintThemeIcon();
+}
+const savedTheme=localStorage.getItem('theme');
+if(savedTheme==='dark'||savedTheme==='light') applyTheme(savedTheme);
+else paintThemeIcon();   // follow the OS; leaving data-theme unset
+themeBtn.onclick=()=>applyTheme(currentTheme()==='dark'?'light':'dark');
 </script>
 </body>
 </html>

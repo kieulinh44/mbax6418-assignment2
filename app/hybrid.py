@@ -207,6 +207,12 @@ class Corpus:
         """
         from . import ingest
         with self._lock:
+            # reject documents already in the index BEFORE parsing anything
+            existing_docs = {p["doc"] for p in self.pages}
+            for fp in file_paths:
+                if ingest._slug(os.path.basename(fp)) in existing_docs:
+                    raise ValueError(f"Already indexed (rename or delete first): {os.path.basename(fp)}")
+
             new_pages = []
             for fp in file_paths:
                 ps = ingest.ingest_file(fp)
@@ -214,12 +220,6 @@ class Corpus:
                     new_pages.extend(ps)
             if not new_pages:
                 raise ValueError("No supported content found in the uploaded file(s).")
-
-            # reject documents already in the index (same slug = same file)
-            existing_docs = {p["doc"] for p in self.pages}
-            dups = [p["file"] for p in new_pages if p["doc"] in existing_docs]
-            if dups:
-                raise ValueError(f"Already indexed (rename or delete first): {dups[0]}")
 
             merged = self.pages + new_pages
             _atomic_write_json(os.path.join(config.DATA_INDEX, "pages.json"), merged)
