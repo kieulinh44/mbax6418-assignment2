@@ -19,9 +19,40 @@ using course materials (slides, syllabus, and other files from Canvas).
 | `.docx` | ✅ | ⏳ phase 2 |
 | `.md` / `.txt` | ✅ | n/a |
 
-From the dashboard, students can **download the source files** or **upload new
-material** (PDF/PPTX/DOCX/MD/TXT); uploads are ingested and indexed
-incrementally without restarting the server.
+From the dashboard, students can **download the source files**, **upload new
+material** (PDF/PPTX/DOCX/MD/TXT), and **remove** documents (removal purges the
+document's searchable content — pages, slide images, embeddings — so later
+answers don't rely on it). Uploading the same file twice is refused (no
+duplicates).
+
+## PowerPoint (.pptx) conversion
+Direct upload of `.pptx` decks is supported. Under the hood the app uses
+**Python + LibreOffice** to convert each deck to PDF and render every slide to
+an image (so answers can show pictures of the actual slides). 
+
+- **Required extra software:** LibreOffice
+  (`winget install --id TheDocumentFoundation.LibreOffice -e`, or install from
+  libreoffice.org). Without it, `.pptx` text still indexes but slide *images*
+  are not produced.
+- **How conversion works:** upload → LibreOffice `--convert-to pdf` → each PDF
+  page rendered as a PNG at dpi 120 → image stored alongside the slide text.
+- **Manual workaround:** exporting a deck to PDF yourself (PowerPoint: File →
+  Export → PDF) and uploading the PDF works equally well and needs no extra
+  software.
+- **Verify converted slides look correct:** after uploading, find the deck in
+  the file list, ask the assistant a question about it, and confirm the slide
+  image shown in the sources matches the deck's slide (title text, diagrams,
+  and layout intact). Slide images are also listed under
+  `data/index/pages/` (files named `<deck>_sNNN.png` — open a few and eyeball
+  them against the original deck).
+
+## Test question set
+A graded set of 5–10 questions (syllabus, slide text, **visual questions
+including the meme slide**, and one intentionally unanswerable question) lives
+in [docs/EVALUATION.md](docs/EVALUATION.md), with a runner script:
+```bash
+python scripts/eval_questions.py   # runs each question against the local app
+```
 
 ## Setup
 ```bash
@@ -43,13 +74,13 @@ python -m uvicorn app.main:app --reload --port 8000
 # 4. Open http://localhost:8000
 ```
 
-## Test sample (no real materials needed)
+## Quick start (real materials)
 ```bash
-python scripts/sample_pdf.py   # writes data/raw/sample-lecture.pdf
-python -m scripts.ingest
-python -m uvicorn app.main:app --reload --port 8000
+# 1. Put course files in data/raw/ (or upload them from the dashboard once running)
+python -m scripts.ingest          # ingest + build the hybrid index
+python -m uvicorn app.main:app --port 8000
+# open http://localhost:8000 — Q&A, quizzes, download/upload
 ```
-Then ask: "What is L2 regularization and how does it differ from L1?"
 
 ## Architecture
 
@@ -60,15 +91,16 @@ course files → ingest (text + rendered page/slide image per page)
             → chunk pages (text splitter) preserving doc·page·section
             → three separate indexes in chromadb + bm25s:
                 keyword (BM25)  ·  text embeddings (all-MiniLM)  ·  visual (CLIP images)
-query → run all three → reciprocal-rank fusion (rerank)
+query → run all three → weighted score fusion (rerank)
      → top text chunks + their page images as evidence
      → grounded answer (DeepSeek) + vision pass (Qwen) over relevant images
      → {answer, sources, validation} — sources validated against evidence
 ```
 
-- **Chunking:** `langchain-text-splitters` (`RecursiveCharacterTextSplitter`), each chunk tagged with doc/file/page/section.
+- **Chunking:** `langchain-text-splitters` (`RecursiveCharacterTextSplitter`), each chunk tagged with doc/file/page/section (deterministic ids so uploads/removals update incrementally).
 - **Keyword:** `bm25s`; **text vectors:** `chromadb` collection with all-MiniLM; **visual vectors:** `chromadb` collection with CLIP `clip-ViT-B-32` over every page image, queried cross-modally by the text question.
-- **Combine/rerank:** Reciprocal Rank Fusion across the three ranked lists, collapsed to pages keeping each page's best chunk + original image.
+- **Combine/rerank:** weighted score fusion — per-stage min-max normalization of BM25, text-cosine, and visual-cosine scores, summed with weights (visual boosts surfaced pages for text questions; visual leads when the question is explicitly about an image/diagram/meme).
+- **Add/remove:** the dashboard supports upload (incremental indexing) and removal (purges the document's pages, chunks, embeddings, and images); duplicate uploads are refused.
 - **Validation:** after generation, citations are checked against the retrieved evidence; the response carries separate `answer` and `sources` fields plus `validation.all_sources_supported`.
 
 ## Notes

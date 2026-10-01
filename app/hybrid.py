@@ -8,17 +8,21 @@ Three complementary indexes over the course pages, kept separate per the spec:
 
 Pages are split into overlapping chunks (langchain-text-splitters), each
 preserving source details (doc, file, page, section). Retrieval runs all three
-indexes, combines candidates by Reciprocal Rank Fusion (rerank), and returns the
-best text chunks together with their original page/slide images.
+indexes, combines candidates by weighted score fusion (min-max normalized BM25
++ text-cosine + visual-cosine), and returns the best text chunks together with
+their original page/slide images.
 
 Indexes are cached in data/index/ (gitignored) so server startup is fast.
 """
 import json
+import logging
 import os
 
 import numpy as np
 
 from . import config
+
+log = logging.getLogger("course-assistant")
 
 # ---------------------------------------------------------------------------
 # lazy model singletons
@@ -44,6 +48,15 @@ def _clip_model():
         print("Loading CLIP model: clip-ViT-B-32")
         _clip = SentenceTransformer("clip-ViT-B-32")
     return _clip
+
+
+def _atomic_write_json(path, obj):
+    """Write JSON atomically (tmp + rename) so concurrent readers never see
+    a half-written file."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 def load_pages():
@@ -102,6 +115,16 @@ def _visual_id(page):
 # ---------------------------------------------------------------------------
 # corpus
 # ---------------------------------------------------------------------------
+_IMAGE_QUERY_WORDS = ("diagram", "chart", "graph", "meme", "slide image", "picture",
+                      "visual", "image", "illustration", "screenshot", "figure",
+                      "what is on the slide", "describe the slide", "show me the")
+
+
+def _is_image_query(query):
+    q = query.lower()
+    return any(w in q for w in _IMAGE_QUERY_WORDS)
+
+
 class Corpus:
     def __init__(self, rebuild=False):
         import threading
@@ -123,8 +146,7 @@ class Corpus:
         p = self._chunks_path()
         if rebuild or not os.path.exists(p):
             chunks = _chunk_pages(self.pages)
-            with open(p, "w", encoding="utf-8") as f:
-                json.dump(chunks, f, ensure_ascii=False, indent=2)
+            _atomic_write_json(p, chunks)
             return chunks
         with open(p, encoding="utf-8") as f:
             return json.load(f)
@@ -200,12 +222,10 @@ class Corpus:
                 raise ValueError(f"Already indexed (rename or delete first): {dups[0]}")
 
             merged = self.pages + new_pages
-            with open(os.path.join(config.DATA_INDEX, "pages.json"), "w", encoding="utf-8") as f:
-                json.dump(merged, f, ensure_ascii=False, indent=2)
+            _atomic_write_json(os.path.join(config.DATA_INDEX, "pages.json"), merged)
 
             chunks = _chunk_pages(merged)
-            with open(self._chunks_path(), "w", encoding="utf-8") as f:
-                json.dump(chunks, f, ensure_ascii=False, indent=2)
+            _atomic_write_json(self._chunks_path(), chunks)
             self.pages, self.chunks = merged, chunks
 
             self._build_keyword()
@@ -270,7 +290,8 @@ class Corpus:
         return None
 
     def _visual_page_hits(self, query, doc, top_n=20):
-        """Cross-modal text->image query over the visual index."""
+        """Cross-modal text->image query over the visual index.
+        Returns [(page_index, similarity), ...] ordered by similarity."""
         if not self.visual_coll.count():
             return []
         clip = _clip_model()
@@ -278,10 +299,72 @@ class Corpus:
         where = {"doc": doc} if doc else None
         res = self.visual_coll.query(query_embeddings=[qv], n_results=min(top_n, self.visual_coll.count()),
                                      where=where)
-        return [i for i in (self._page_index_by_visual_id(v) for v in res["ids"][0]) if i is not None]
+        out = []
+        for vid, dist in zip(res["ids"][0], res["distances"][0]):
+            pi = self._page_index_by_visual_id(vid)
+            if pi is not None:
+                out.append((pi, 1.0 - float(dist)))
+        return out
+
+    # ---- removal ---------------------------------------------------------
+    def remove_document(self, doc):
+        """Remove a document and ALL of its searchable content: pages, chunks,
+        text/visual embeddings, keyword hits, rendered images, and the raw file.
+        Returns {"removed", "pages", "chunks"} or None if the doc is unknown."""
+        with self._lock:
+            removed_pages = [p for p in self.pages if p["doc"] == doc]
+            if not removed_pages:
+                return None
+            remaining = [p for p in self.pages if p["doc"] != doc]
+
+            # chunks to drop: deterministic prefix doc__p
+            keep_chunks = [c for c in self.chunks if c["doc"] != doc]
+            drop_cids = [c["cid"] for c in self.chunks if c["doc"] == doc]
+            drop_visual = [_visual_id(p) for p in removed_pages]
+
+            _atomic_write_json(os.path.join(config.DATA_INDEX, "pages.json"), remaining)
+            _atomic_write_json(self._chunks_path(), keep_chunks)
+
+            # vectors
+            to_del_txt = [c for c in drop_cids if c in self.text_coll.get()["ids"]]
+            if to_del_txt:
+                self.text_coll.delete(ids=to_del_txt)
+            to_del_vis = [v for v in drop_visual if v in self.visual_coll.get()["ids"]]
+            if to_del_vis:
+                self.visual_coll.delete(ids=to_del_vis)
+
+            # keyword (rebuilt in memory over remaining chunks)
+            self.chunks, self.pages = keep_chunks, remaining
+            self._build_keyword()
+
+            # rendered page/slide images
+            for p in removed_pages:
+                if p.get("image"):
+                    img = os.path.join(config.DATA_INDEX, p["image"])
+                    if os.path.exists(img):
+                        try:
+                            os.remove(img)
+                        except OSError:
+                            pass
+
+            # raw source file
+            for p in removed_pages:
+                raw = os.path.join(config.DATA_RAW, p["file"])
+                if os.path.exists(raw) and os.path.isfile(raw):
+                    try:
+                        os.remove(raw)
+                    except OSError:
+                        pass
+
+            return {"removed": doc, "pages": len(remaining), "chunks": len(keep_chunks)}
 
     # ---- retrieval -----------------------------------------------------
     def retrieve(self, query, top_k=None, doc=None, topic=None):
+        """Thread-safe retrieval: serializes against upload index mutation."""
+        with self._lock:
+            return self._retrieve_unlocked(query, top_k=top_k, doc=doc, topic=topic)
+
+    def _retrieve_unlocked(self, query, top_k=None, doc=None, topic=None):
         top_k = top_k or config.RETRIEVE_TOP_K
         if not self.chunks:
             return []
@@ -289,55 +372,89 @@ class Corpus:
         cand_set = set(cand_i)
         cand_cids = {self.chunks[i]["cid"] for i in cand_i}
         cand_pages = self._candidate_page_set(doc, topic)
+        cid_to_i = {c["cid"]: i for i, c in enumerate(self.chunks)}
         if not cand_set:
             return []
 
         import bm25s
-        ranked = []  # list of ranked chunk-id lists
+        fused = {}  # cid -> weighted fused score
 
-        # 1) keyword (BM25) over full index, then filtered to candidates
+        def add_stage(scores, weight):
+            """Min-max normalize one stage's raw scores, then add weighted."""
+            if not scores:
+                return
+            vals = list(scores.values())
+            lo, hi = min(vals), max(vals)
+            span = hi - lo
+            for cid, s in scores.items():
+                n = (s - lo) / span if span > 1e-9 else 1.0
+                fused[cid] = fused.get(cid, 0.0) + weight * n
+
+        # 1) keyword (BM25) — raw scores preserve dominance
         res = self.retriever.retrieve(bm25s.tokenize([query], stopwords="en"),
                                       k=min(len(self.chunks), 100))
-        # `documents` == corpus indices when no corpus is attached
-        kw_ids = [self.chunks[int(i)]["cid"] for i in res.documents[0] if int(i) in cand_set]
-        if kw_ids:
-            ranked.append(kw_ids)
+        kw = {}
+        for i, s in zip(res.documents[0], res.scores[0]):
+            i = int(i)
+            if i in cand_set:
+                kw[self.chunks[i]["cid"]] = float(s)
+        add_stage(kw, 1.0)
 
         # 2) text embeddings (chromadb), filtered to candidates
         qv = self.text_enc.encode(query).tolist()
         where = {"doc": doc} if doc else None
+        txt = {}
         try:
             res = self.text_coll.query(query_embeddings=[qv],
                                        n_results=min(60, max(len(cand_set), 1)),
                                        where=where)
-            txt_ids = [cid for cid in res["ids"][0] if cid in cand_cids]
-            if txt_ids:
-                ranked.append(txt_ids)
+            txt = {cid: 1.0 - float(d) for cid, d in zip(res["ids"][0], res["distances"][0])
+                   if cid in cand_cids}
+            add_stage(txt, 1.0)
         except Exception:
-            pass
+            log.exception("chroma text-embedding query failed")
 
-        # 3) visual embeddings (CLIP) — cross-modal, then mapped to candidate pages
+        # 3) visual embeddings (CLIP) — cross-modal. For text questions, visual
+        #    only BOOSTS pages already surfaced by keyword/text (avoids irrelevant
+        #    diagram slides dominating); for explicit image questions visual leads.
         try:
+            image_query = _is_image_query(query)
+            vis_weight = 1.0 if image_query else 0.35
             v_pages = self._visual_page_hits(query, doc)
-            v_pages = [p for p in v_pages if p in cand_pages]
-            v_ids = [self.chunks[i]["cid"] for i in range(len(self.chunks))
-                     if self.chunks[i]["page_index"] in v_pages]
-            if v_ids:
-                ranked.append(v_ids)
+            if not image_query:
+                surfaced = set()
+                for cid in kw:
+                    i = cid_to_i.get(cid)
+                    if i is not None:
+                        surfaced.add(self.chunks[i]["page_index"])
+                for cid in txt:
+                    i = cid_to_i.get(cid)
+                    if i is not None:
+                        surfaced.add(self.chunks[i]["page_index"])
+                v_pages = [(pi, s) for pi, s in v_pages if pi in surfaced]
+            v_pages = [(pi, s) for pi, s in v_pages if pi in cand_pages]
+            page_chunks = {}
+            for i, ch in enumerate(self.chunks):
+                page_chunks.setdefault(ch["page_index"], []).append(ch["cid"])
+            vis = {}
+            for pi, sim in v_pages:
+                for cid in page_chunks.get(pi, []):
+                    if image_query or cid in fused:
+                        vis[cid] = max(vis.get(cid, 0.0), sim)
+            # image queries: ensure a visual-only page still contributes its chunks
+            if not vis:
+                for pi, sim in v_pages:
+                    for cid in page_chunks.get(pi, []):
+                        vis[cid] = max(vis.get(cid, 0.0), sim)
+            add_stage(vis, vis_weight)
         except Exception:
-            pass
+            log.exception("chroma visual-embedding query failed")
 
-        # Reciprocal Rank Fusion (rerank across the three lists)
-        rrf, k = {}, 60
-        for lst in ranked:
-            for rank, item in enumerate(lst):
-                rrf[item] = rrf.get(item, 0) + 1.0 / (k + rank + 1)
-        if not rrf:
+        if not fused:
             return []
-        ordered = sorted(rrf, key=rrf.get, reverse=True)
+        ordered = sorted(fused, key=fused.get, reverse=True)
 
-        # collapse to pages (best chunk per page), ordered by RRF score
-        cid_to_i = {c["cid"]: i for i, c in enumerate(self.chunks)}
+        # collapse to pages (best chunk per page), ordered by fused score
         best_chunk = {}
         for cid in ordered:
             i = cid_to_i.get(cid)
@@ -345,7 +462,7 @@ class Corpus:
                 continue
             pi = self.chunks[i]["page_index"]
             if pi not in best_chunk:
-                best_chunk[pi] = (cid, rrf[cid])
+                best_chunk[pi] = (cid, fused[cid])
         ordered_pages = sorted(best_chunk.items(), key=lambda kv: -kv[1][1])[:top_k]
 
         hits = []

@@ -50,6 +50,9 @@
 .sel{display:inline-flex;align-items:center;gap:8px;margin-top:10px}
 .mat{display:inline-flex;gap:6px;align-items:center;margin:4px 8px 4px 0;padding:7px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text);font-size:13.5px}
 .mat:hover{border-color:var(--accent);color:var(--accent)}
+.rbtn{background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--bad);cursor:pointer}
+.rbtn:hover{border-color:var(--bad);background:#fdeeee}
+.rbtn:disabled{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -122,10 +125,29 @@ async function refreshFiles(){
   const r = await fetch('/api/files');
   const {documents} = await r.json();
   const files = $('files');
-  if(!documents.length){ files.textContent = 'No files ingested yet. Put course files in data/raw and run ingest.'; return; }
-  files.innerHTML = documents.map(d=>`<span class="tag">${d.file} · ${d.pages} page/slide</span>`).join('');
-  const opts = '<option value="">All documents</option>'+documents.map(d=>`<option value="${d.doc}">${d.file}</option>`).join('');
+  if(!documents.length){ files.textContent = 'No files ingested yet. Upload course files above, or put them in data/raw and run ingest.'; return; }
+  files.innerHTML = documents.map(d=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span class="tag" style="margin:0">${esc(d.file)} · ${d.pages} page/slide</span>
+      <button class="rbtn" data-doc="${esc(d.doc)}" title="Remove from the assistant">🗑 Remove</button>
+    </div>`).join('');
+  document.querySelectorAll('.rbtn').forEach(b=>b.onclick=()=>removeDoc(b.dataset.doc));
+  const opts = '<option value="">All documents</option>'+documents.map(d=>`<option value="${esc(d.doc)}">${esc(d.file)}</option>`).join('');
   $('doc').innerHTML = opts; $('qdoc').innerHTML = opts;
+}
+async function removeDoc(doc){
+  const docName = $('doc').selectedOptions[0]?.text || doc;
+  if(!confirm(`Remove '${docName}' from the assistant?`+
+      '\nThis deletes its searchable content (pages, slide images, embeddings) '+
+      'and the source file — later answers will not use it.')) return;
+  const btn = document.querySelector(`.rbtn[data-doc="${doc}"]`);
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{
+    const r = await fetch(`/api/documents/${encodeURIComponent(doc)}`, {method:'DELETE'});
+    const data = await r.json();
+    if(!r.ok){ alert('✗ '+(data.detail||'Remove failed')); return; }
+    await refreshFiles();
+  }catch(e){ alert('✗ Error: '+e); }
 }
 async function loadMaterials(){
   const el = $('materials');
@@ -146,7 +168,11 @@ async function uploadFiles(){
   try{
     const r=await fetch('/api/upload',{method:'POST',body:fd});
     const data=await r.json();
-    if(!r.ok){ st.textContent='✗ '+(data.detail||'Upload failed'); return; }
+    if(!r.ok){
+      if(r.status===409) st.textContent='✓ Already in the index — no duplicate added.';
+      else st.textContent='✗ '+(data.detail||'Upload failed');
+      return;
+    }
     st.textContent='✓ Indexed: '+data.result.added.join(', ')+' · '+data.result.pages+' pages total.';
     inp.value=''; await refreshFiles();
   }catch(e){ st.textContent='✗ Error: '+e; }
@@ -164,8 +190,8 @@ async function ask(){
     $('answer').textContent=data.answer;
     const s=$('sources');
     s.innerHTML=(data.sources||[]).map(c=>`
-      <div class="card cite"><div class="meta"><strong>${c.file}</strong> · page/slide ${c.page}${c.section?` · ${c.section}`:''}</div>
-      <pre>${esc(c.excerpt)}</pre>${c.image?`<img src="${c.image}" alt="page ${c.page}">`:''}</div>`).join('');
+      <div class="card cite"><div class="meta"><strong>${esc(c.file)}</strong> · page/slide ${c.page}${c.section?` · ${esc(c.section)}`:''}</div>
+      <pre>${esc(c.excerpt)}</pre>${c.image?`<img src="${esc(c.image)}" alt="page ${c.page}">`:''}</div>`).join('');
   }catch(e){ alert('Error: '+e); }
   finally{ btn.disabled=false; btn.textContent='Ask'; }
 }
@@ -180,7 +206,7 @@ async function generateQuiz(){
     const q=await r.json();
     quizId=q.quiz_id;
     $('quizhere').innerHTML =
-      `<div class="card"><div class="score">${q.title}</div>
+      `<div class="card"><div class="score">${esc(q.title)}</div>
        <p class="muted">Answer each question, then grade. Solutions are revealed only after you answer or request them.</p>
        ${q.questions.map((qst,idx)=>`
         <div class="question" id="qb-${qst.id}">

@@ -62,6 +62,10 @@ def _build_lookup(pages):
 def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=3000):
     """Retrieve candidate pages, have the model write MCQs, return quiz with a
     fixed answer key (answer_idx + explanation) in server-side storage."""
+    try:
+        n = max(2, min(int(n), 6))
+    except (TypeError, ValueError):
+        n = 4
     theme = (question_theme or "").strip() or "the selected course material"
     pages_res = hybrid.get_corpus().retrieve(theme, top_k=10, doc=doc, topic=topic)
     if not pages_res:
@@ -86,15 +90,19 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
         "Return ONLY the JSON array — no prose, no markdown fences."
     )
     user = ("Generate a practice quiz about: " + theme + "\n\nCOURSE MATERIAL:\n" + context)
-    raw = llm.chat([{"role": "system", "content": sys},
-                    {"role": "user", "content": user}], max_tokens=max_tokens)
+    try:
+        raw = llm.chat([{"role": "system", "content": sys},
+                        {"role": "user", "content": user}], max_tokens=max_tokens)
+    except Exception as e:
+        raise RuntimeError(f"Quiz generation model call failed: {e}")
     data = _extract_json(raw)
     questions = []
     look = _build_lookup(hits)
-    n = max(2, min(n, 6))
     if not isinstance(data, list):
         data = []
     for i, q in enumerate(data[:n]):
+        if not isinstance(q, dict):
+            continue
         opts = q.get("options")
         if not isinstance(opts, list) or len(opts) < 4:
             continue
@@ -102,10 +110,17 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
         txt = str(q.get("question", "")).strip()
         if not txt:
             continue
-        ans = int(q.get("answer_idx", 0)) % 4
+        try:
+            ans = int(q.get("answer_idx", 0)) % 4
+        except (TypeError, ValueError):
+            continue  # malformed answer key -> skip this question
         expl = str(q.get("explanation", "")).strip()
-        # map back to a real source page
-        src = look.get((q.get("source_file"), int(q.get("source_page", 0))))
+        # map back to a real source page (skip question if the page ref is invalid)
+        src = None
+        try:
+            src = look.get((q.get("source_file"), int(q.get("source_page", 0))))
+        except (TypeError, ValueError):
+            src = None
         source = _source_for(src) if src else _source_for(hits[0])
         questions.append({
             "id": f"q{i + 1}",
@@ -144,20 +159,26 @@ def grade_quiz(quiz_id, answers=None):
     quiz = _STORE.get(quiz_id)
     if not quiz:
         return None
-    answered = answers or {}
     results = []
     for q in quiz["questions"]:
-        selected = answered.get(q["id"])
-        correct = selected is not None and int(selected) == q["answer_idx"]
+        selected = answers.get(q["id"])
+        selected_i = None
+        if selected is not None:
+            try:
+                selected_i = int(selected)
+            except (TypeError, ValueError):
+                selected_i = None
+        correct = selected_i is not None and selected_i == q["answer_idx"]
         results.append({
             "id": q["id"],
             "correct_answer": q["answer_idx"],
-            "your_answer": int(selected) if selected is not None else None,
+            "your_answer": selected_i,
             "correct": correct,
             "explanation": q["explanation"],
             "source": q["source"],
         })
-    if answered:
+    any_answered = any(r["your_answer"] is not None for r in results)
+    if any_answered:
         score = sum(1 for r in results if r["correct"])
         return {"quiz_id": quiz_id, "revealed": True, "score": score, "total": len(results),
                 "percent": round(100 * score / max(len(results), 1)), "results": results}
