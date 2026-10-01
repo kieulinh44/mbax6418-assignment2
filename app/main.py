@@ -222,10 +222,16 @@ def ask(payload: dict):
     question = (payload.get("question") or "").strip()
     doc = payload.get("doc") or None
     topic = payload.get("topic") or None
+    retrieval_mode = payload.get("retrieval_mode", "hybrid")
     if not question:
         raise HTTPException(400, "question is required")
 
-    hits = hybrid.get_corpus().retrieve(question, doc=doc, topic=topic)
+    try:
+        hits = hybrid.get_corpus().retrieve(
+            question, doc=doc, topic=topic, retrieval_mode=retrieval_mode
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     if not hits:
         return {
             "answer": "I could not find any matching material in the course files. "
@@ -236,7 +242,7 @@ def ask(payload: dict):
             "vision_sources": [],
             "visual_warnings": [],
             "validation": {"checked": 0, "all_sources_supported": True},
-            "retrieval": "hybrid(keyword+text+visual)",
+            "retrieval": retrieval_mode,
         }
 
     # Best evidence: top chunks as context, original page images as visual evidence
@@ -364,7 +370,7 @@ def ask(payload: dict):
         "vision_sources": vision_sources,
         "visual_warnings": visual_warnings,
         "validation": validation,
-        "retrieval": "hybrid(keyword+text+visual)",
+        "retrieval": retrieval_mode,
     }
 
 

@@ -108,6 +108,23 @@ in [docs/EVALUATION.md](docs/EVALUATION.md), with a runner script:
 python scripts/eval_questions.py   # runs each question against the local app
 ```
 
+## Evaluation and comparison
+
+The canonical nine-question set is [docs/EVALUATION.md](docs/EVALUATION.md),
+and the manual-review report template is [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md).
+After ingesting the syllabus and required Week 2–5 slides, run:
+
+```bash
+python scripts/compare_retrieval.py
+```
+
+The comparison runs every question with the default `hybrid` mode (BM25 +
+text embeddings + CLIP visual fusion) and `text_keyword_only` (BM25 + text
+embeddings with visual retrieval/fusion disabled). It records timing, raw
+answers, sources, validation, and Question 9's missing-information behavior in
+`docs/evaluation_results.json`. Correctness and source support require manual
+review; the script does not fabricate evaluation outcomes.
+
 ## Setup
 ```bash
 python -m venv .venv

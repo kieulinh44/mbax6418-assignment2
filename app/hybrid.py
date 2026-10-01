@@ -119,6 +119,14 @@ def _visual_id(page):
 _IMAGE_QUERY_WORDS = ("diagram", "chart", "graph", "meme", "slide image", "picture",
                       "visual", "image", "illustration", "screenshot", "figure",
                       "what is on the slide", "describe the slide", "show me the")
+RETRIEVAL_MODES = ("hybrid", "text_keyword_only")
+
+
+def normalize_retrieval_mode(mode):
+    value = (mode or "hybrid").strip().lower()
+    if value not in RETRIEVAL_MODES:
+        raise ValueError(f"retrieval_mode must be one of: {', '.join(RETRIEVAL_MODES)}")
+    return value
 
 
 def _is_image_query(query):
@@ -361,12 +369,15 @@ class Corpus:
             return {"removed": doc, "pages": len(remaining), "chunks": len(keep_chunks)}
 
     # ---- retrieval -----------------------------------------------------
-    def retrieve(self, query, top_k=None, doc=None, topic=None):
+    def retrieve(self, query, top_k=None, doc=None, topic=None, retrieval_mode="hybrid"):
         """Thread-safe retrieval: serializes against upload index mutation."""
         with self._lock:
-            return self._retrieve_unlocked(query, top_k=top_k, doc=doc, topic=topic)
+            return self._retrieve_unlocked(query, top_k=top_k, doc=doc, topic=topic,
+                                           retrieval_mode=retrieval_mode)
 
-    def _retrieve_unlocked(self, query, top_k=None, doc=None, topic=None):
+    def _retrieve_unlocked(self, query, top_k=None, doc=None, topic=None,
+                           retrieval_mode="hybrid"):
+        retrieval_mode = normalize_retrieval_mode(retrieval_mode)
         top_k = top_k or config.RETRIEVE_TOP_K
         if not self.chunks:
             return []
@@ -441,9 +452,9 @@ class Corpus:
         #    only BOOSTS pages already surfaced by keyword/text (avoids irrelevant
         #    diagram slides dominating); for explicit image questions visual leads.
         try:
-            image_query = _is_image_query(query)
-            vis_weight = 1.0 if image_query else 0.35
-            v_pages = self._visual_page_hits(query, doc, where=where)
+            image_query = _is_image_query(query) if retrieval_mode == "hybrid" else False
+            vis_weight = (1.0 if image_query else 0.35) if retrieval_mode == "hybrid" else 0.0
+            v_pages = self._visual_page_hits(query, doc, where=where) if retrieval_mode == "hybrid" else []
             if not image_query:
                 surfaced = set()
                 for cid in kw:
