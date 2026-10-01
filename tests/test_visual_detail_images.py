@@ -1,4 +1,12 @@
 """Native-resolution visual evidence from the exact retrieved PPTX slide."""
+
+# Heavy model stack required (bm25s / chromadb / sentence-transformers).
+# Skip on light test environments (CI with requirements-dev.txt) instead of failing.
+import pytest
+pytest.importorskip("bm25s")
+pytest.importorskip("sentence_transformers")
+pytest.importorskip("chromadb")
+
 import base64
 import io
 import tempfile

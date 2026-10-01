@@ -1,4 +1,12 @@
 """Slide rendering regression tests, no external model calls."""
+
+# Heavy model stack required (bm25s / chromadb / sentence-transformers).
+# Skip on light test environments (CI with requirements-dev.txt) instead of failing.
+import pytest
+pytest.importorskip("bm25s")
+pytest.importorskip("sentence_transformers")
+pytest.importorskip("chromadb")
+
 import tempfile
 import unittest
 from pathlib import Path
