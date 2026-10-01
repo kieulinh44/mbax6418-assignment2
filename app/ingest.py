@@ -31,13 +31,12 @@ def _find_soffice():
     global _SOFFICE
     if _SOFFICE is not None:
         return _SOFFICE
-    candidates = shutil.which("soffice") or shutil.which("libreoffice") or ""
-    if not candidates:
-        candidates = [
-            r"C:/Program Files/LibreOffice/program/soffice.exe",
-            r"C:/Program Files (x86)/LibreOffice/program/soffice.exe",
-            "/usr/bin/soffice", "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-        ]
+    executable = shutil.which("soffice") or shutil.which("libreoffice")
+    candidates = [executable] if executable else [
+        r"C:/Program Files/LibreOffice/program/soffice.exe",
+        r"C:/Program Files (x86)/LibreOffice/program/soffice.exe",
+        "/usr/bin/soffice", "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ]
     for c in candidates:
         if c and os.path.exists(c):
             _SOFFICE = c
@@ -127,26 +126,28 @@ def _render_pptx_slides(path, doc_id, pages_dir):
     soffice = _find_soffice()
     if not soffice:
         return {}
-    convert_dir = os.path.join(config.DATA_INDEX, "convert")
-    os.makedirs(convert_dir, exist_ok=True)
+    from pathlib import Path
+    os.makedirs(config.DATA_INDEX, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=config.DATA_INDEX) as td:
-        pdf_path = os.path.join(td, "deck.pdf")
-        subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", td, path],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        pdf = os.path.join(td, "deck.pdf")
-        if not os.path.exists(pdf):
-            # LibreOffice names output after the source; find the produced pdf
-            pdfs = [f for f in os.listdir(td) if f.lower().endswith(".pdf")]
-            if pdfs:
-                pdf = os.path.join(td, pdfs[0])
+        profile_uri = (Path(td) / "lo-profile").resolve().as_uri()
+        # Isolate the headless process from any open LibreOffice window. Export
+        # hidden slides too, otherwise PDF page numbers no longer match slides.
+        pdf_filter = 'pdf:impress_pdf_Export:{"ExportHiddenSlides":{"type":"boolean","value":"true"}}'
+        subprocess.run(
+            [soffice, f"-env:UserInstallation={profile_uri}", "--headless",
+             "--convert-to", pdf_filter, "--outdir", td, os.path.abspath(path)],
+            capture_output=True, text=True, check=True, timeout=120,
+        )
+        pdf = os.path.join(td, os.path.splitext(os.path.basename(path))[0] + ".pdf")
+        if not os.path.isfile(pdf):
+            raise RuntimeError("LibreOffice did not produce a PDF for this slide deck.")
         images = {}
-        if os.path.exists(pdf):
-            with fitz.open(pdf) as doc:
-                for i in range(len(doc)):
-                    pix = doc[i].get_pixmap(dpi=120)
-                    img_name = f"{doc_id}_s{i + 1:03d}.png"
-                    pix.save(os.path.join(pages_dir, img_name))
-                    images[i + 1] = os.path.join("pages", img_name)  # 1-based slide number
+        with fitz.open(pdf) as doc:
+            for i in range(len(doc)):
+                pix = doc[i].get_pixmap(dpi=120)
+                img_name = f"{doc_id}_s{i + 1:03d}.png"
+                pix.save(os.path.join(pages_dir, img_name))
+                images[i + 1] = os.path.join("pages", img_name)
     return images
 
 
@@ -158,6 +159,8 @@ def _ingest_pptx(path):
     doc_id = _slug(os.path.basename(path))
     images = _render_pptx_slides(path, doc_id, pages_dir)
     prs = Presentation(path)
+    if images and set(images) != set(range(1, len(prs.slides) + 1)):
+        raise RuntimeError("Rendered slide count does not match the original deck; refusing incorrect slide labels.")
     pages = []
     for i, slide in enumerate(prs.slides, start=1):
         parts = []

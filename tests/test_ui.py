@@ -43,6 +43,29 @@ class DashboardTests(unittest.TestCase):
                 self.page.locator(f'[data-tab="{tab}"]').click()
                 self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
 
+    def test_retrieved_slide_image_has_caption_and_explain_control(self):
+        self.page.route('**/api/ask', lambda route: route.fulfill(json={
+            'answer': 'Browser test fixture answer.',
+            'sources': [{'doc': 'sample-lecture', 'file': 'lecture.pptx', 'kind': 'pptx',
+                         'page': 2, 'label': 'Slide 2', 'excerpt': 'Evidence excerpt',
+                         'image': '/pages/sample-lecture_p002.png'}],
+            'visual_warnings': ['Browser test fixture warning.']
+        }))
+        self.page.locator('#q').fill('Explain the diagram in these slides.')
+        self.page.locator('#askBtn').click()
+        self.page.locator('#sources figure').wait_for()
+        self.assertIn('lecture.pptx', self.page.locator('#sources figcaption').inner_text())
+        self.assertIn('Slide 2', self.page.locator('#sources figcaption').inner_text())
+        image=self.page.locator('#sources img')
+        self.assertIn('lecture.pptx', image.get_attribute('alt') or '')
+        self.page.wait_for_function('document.querySelector("#sources img").naturalWidth>0')
+        self.assertIn('Browser test fixture warning.', self.page.locator('#visualWarnings').inner_text())
+        self.page.locator('#sources .explain-slide').click()
+        self.assertEqual(self.page.locator('#doc').input_value(), 'sample-lecture')
+        self.assertIn('slide 2', self.page.locator('#q').input_value().lower())
+        self.page.locator('[data-tab="materials"]').click()
+        self.assertFalse(self.page.locator('#sources').is_visible())
+
     def test_tab_deep_links_open_requested_panel(self):
         for tab in ['qa', 'quiz', 'materials']:
             self.page.goto(f'http://127.0.0.1:8000/?tab={tab}')

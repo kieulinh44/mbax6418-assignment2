@@ -46,6 +46,60 @@ an image (so answers can show pictures of the actual slides).
   `data/index/pages/` (files named `<deck>_sNNN.png` — open a few and eyeball
   them against the original deck).
 
+## Slide-image RAG and visual questions
+
+Q&A combines BM25 keyword retrieval, text embeddings, and CLIP slide-image
+embeddings. Retrieved source images are rendered copies of the original slides,
+not AI-generated illustrations. The answer appears next to a gallery with the
+**document filename and Slide N / Page N**, full-size image links, and an
+**Explain this slide** action. On smaller screens the gallery stacks below the answer.
+
+Select a course document and try:
+- “Explain the diagram showing keyword search, vector search, and reranking.”
+- “Explain the two charts on slide 7.”
+- “Describe the picture on slide 33 and explain its message.”
+
+A singular slide/page number constrains retrieval within the selected document.
+Ambiguous ranges or multiple slide references retain the ordinary hybrid ranking.
+The vision model analyzes up to three available retrieved images in parallel,
+with the question and exact source label supplied separately for each image.
+Its attributed observations are passed to the answer model as course evidence,
+including information missing from extracted text. For retrieved PowerPoint slides,
+the vision pass uses up to three native-resolution embedded pictures from
+that exact slide, cropped to the visible picture area; tiny logos are omitted.
+These replace their downsized duplicates during image analysis to preserve small
+chart labels. Slides without usable raster details use the full-slide render;
+the displayed evidence remains the actual full slide in either case.
+Failed image analysis or missing renders produce explicit limitations instead of
+unsupported visual claims. Internal reasoning and truncated model completions
+are never presented as finished answers.
+The API returns `vision_sources` and `visual_warnings` alongside `answer`,
+`sources` (with `kind`, `label`, and an existing image URL), and `vision_notes`.
+
+**PPTX rendering is required for visual questions:**
+```bash
+# macOS
+brew install --cask libreoffice
+# After installing it, rebuild any previously text-only slide index:
+python -m scripts.ingest
+```
+PowerPoint conversion uses a separate headless LibreOffice profile, includes
+hidden slides to preserve original numbering, and checks the rendered slide count.
+PDF exports can also be uploaded when LibreOffice is unavailable. Original content
+and generated indexes remain local and gitignored.
+
+### Regression tests
+```bash
+# Development dependency only; the app does not require Playwright at runtime.
+pip install playwright
+python -m playwright install chromium
+# Start the local app on port 8000 before running browser tests.
+python -m unittest discover -s tests -v
+```
+The visual-answer and retrieval unit tests isolate external model boundaries.
+Live checks must additionally confirm that actual PNGs load and that model
+explanations match the retrieved course slides.
+
 ## Test question set
 A graded set of 5–10 questions (syllabus, slide text, **visual questions
 including the meme slide**, and one intentionally unanswerable question) lives
