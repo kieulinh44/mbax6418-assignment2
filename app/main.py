@@ -1,5 +1,6 @@
 """FastAPI app: ingest-facing file list + grounded Q&A endpoint."""
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -142,12 +143,22 @@ def _cite(page, excerpt=None):
 
 
 def _validate(answer, hits):
-    """Check that citations actually reference the retrieved evidence."""
+    """Check exact filename plus page/slide-number citations."""
     evidence = {(h["page"]["file"], h["page"]["page"]) for h in hits}
     cited = set()
+    all_citations = set()
+    generic_pattern = re.compile(
+        r"(?:\[)?([^\[\]\n]+?)\s+(?:p(?:age)?\.?|slide)\s*(\d+)(?:\])?",
+        re.IGNORECASE,
+    )
+    for match in generic_pattern.finditer(answer or ""):
+        all_citations.add((match.group(1).strip(" -"), int(match.group(2))))
     for file_, page in evidence:
-        base = os.path.splitext(file_)[0]
-        if base in answer or file_ in answer:
+        citation_pattern = re.compile(
+            re.escape(file_) + r"\s+(?:p(?:age)?\.?|slide)\s*(\d+)",
+            re.IGNORECASE,
+        )
+        if any(int(match.group(1)) == page for match in citation_pattern.finditer(answer or "")):
             cited.add((file_, page))
     sup = sorted(cited)
     unc = sorted(evidence - cited)
@@ -155,7 +166,7 @@ def _validate(answer, hits):
         "checked": len(evidence),
         "sources_used": [{"file": f, "page": p} for f, p in sup],
         "sources_not_cited": [{"file": f, "page": p} for f, p in unc],
-        "all_sources_supported": len(unc) == 0,
+        "all_sources_supported": bool(cited) and not (all_citations - evidence),
     }
 
 
@@ -222,10 +233,16 @@ def ask(payload: dict):
     question = (payload.get("question") or "").strip()
     doc = payload.get("doc") or None
     topic = payload.get("topic") or None
+    retrieval_mode = payload.get("retrieval_mode", "hybrid")
     if not question:
         raise HTTPException(400, "question is required")
 
-    hits = hybrid.get_corpus().retrieve(question, doc=doc, topic=topic)
+    try:
+        hits = hybrid.get_corpus().retrieve(
+            question, doc=doc, topic=topic, retrieval_mode=retrieval_mode
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     if not hits:
         return {
             "answer": "I could not find any matching material in the course files. "
@@ -236,7 +253,7 @@ def ask(payload: dict):
             "vision_sources": [],
             "visual_warnings": [],
             "validation": {"checked": 0, "all_sources_supported": True},
-            "retrieval": "hybrid(keyword+text+visual)",
+            "retrieval": retrieval_mode,
         }
 
     # Best evidence: top chunks as context, original page images as visual evidence
@@ -364,7 +381,7 @@ def ask(payload: dict):
         "vision_sources": vision_sources,
         "visual_warnings": visual_warnings,
         "validation": validation,
-        "retrieval": "hybrid(keyword+text+visual)",
+        "retrieval": retrieval_mode,
     }
 
 
