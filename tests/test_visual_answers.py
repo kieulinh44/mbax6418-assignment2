@@ -205,6 +205,45 @@ class VisualAnswersTests(unittest.TestCase):
                                  f"/pages/slide-{slide}.png")
                 self.assertTrue(result["validation"]["all_sources_supported"])
 
+    def test_meme_locator_displays_only_slide_33_even_with_extra_candidates(self):
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        self.corpus.retrieve.return_value = [
+            self.hit(33, file=filename),
+            self.hit(27, file=filename),
+            self.hit(35, file=filename),
+            self.hit(31, file=filename),
+        ]
+        answer = (
+            f'Direct observations: Slide 33 contains the Vibe Coding on "Prod" meme '
+            f'[{filename} p.33]. Other retrieved candidates are not the requested meme '
+            f'[{filename} p.27] [{filename} p.35].'
+        )
+        self.chat.return_value = answer
+        self.ground.return_value = answer
+
+        result = main.ask({"question": 'Find the meme about Vibe Coding on "Prod".'})
+
+        self.assertEqual(
+            [(source["file"], source["page"]) for source in result["sources"]],
+            [(filename, 33)],
+        )
+        self.assertEqual(result["sources"][0]["image"], "/pages/slide-33.png")
+        self.assertEqual(result["validation"]["sources_used"],
+                         [{"file": filename, "page": 33}])
+        self.assertTrue(result["validation"]["all_sources_supported"])
+
+    def test_multi_source_visual_question_keeps_all_cited_support(self):
+        filename = "lecture.pptx"
+        self.corpus.retrieve.return_value = [self.hit(7), self.hit(8), self.hit(9)]
+        answer = (f"The two charts can be compared [{filename} p.7] "
+                  f"[{filename} p.8].")
+        self.chat.return_value = answer
+        self.ground.return_value = answer
+
+        result = main.ask({"question": "Compare the charts on slides 7 and 8."})
+
+        self.assertEqual([source["page"] for source in result["sources"]], [7, 8])
+
     def test_unsupported_visual_claims_are_revised_before_return(self):
         filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
         self.corpus.retrieve.return_value = [self.hit(7, file=filename)]

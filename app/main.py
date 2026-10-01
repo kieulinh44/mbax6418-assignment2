@@ -1,5 +1,6 @@
 """FastAPI app: ingest-facing file list + grounded Q&A endpoint."""
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -141,15 +142,57 @@ def _cite(page, excerpt=None):
     }
 
 
+def _cited_hits(answer, hits):
+    """Return retrieved hits cited with an exact file and page marker."""
+    cited = []
+    for hit in hits:
+        page = hit["page"]
+        file_ = page["file"]
+        number = page["page"]
+        base = os.path.splitext(file_)[0]
+        markers = (f"[{file_} p.{number}]", f"[{base} p.{number}]")
+        if any(marker in answer for marker in markers):
+            cited.append(hit)
+    return cited
+
+
+def _is_singular_visual_locator(question):
+    """Detect requests to locate one visual item rather than compare several."""
+    text = question.lower()
+    locator = re.search(r"\b(find|locate|show|identify)\b|\bwhich slide\b|\bwhere is\b", text)
+    target = re.search(
+        r"\b(?:the|this|that|a|an)\s+"
+        r"(?:meme|picture|image|diagram|chart|graph|screenshot|figure)\b",
+        text,
+    )
+    multiple = re.search(
+        r"\b(compare|all|multiple|several)\b|"
+        r"\b(memes|pictures|images|diagrams|charts|graphs|screenshots|figures)\b",
+        text,
+    )
+    return bool(locator and target and not multiple)
+
+
+def _display_hits(question, answer, hits):
+    """Keep retrieval broad internally but expose only answer-supporting evidence.
+
+    Exact citations identify the sources used by the validated answer. If a
+    model omits citations, retain the retrieved evidence so a failure never
+    hides the material from the user. Singular visual-locator requests expose
+    only the highest-ranked supporting source.
+    """
+    supporting = _cited_hits(answer, hits)
+    candidates = supporting or hits
+    if _is_singular_visual_locator(question):
+        return candidates[:1]
+    return candidates
+
+
 def _validate(answer, hits):
     """Check that citations name both a retrieved file and its exact page/slide."""
     evidence = {(h["page"]["file"], h["page"]["page"]) for h in hits}
-    cited = set()
-    for file_, page in evidence:
-        base = os.path.splitext(file_)[0]
-        exact_markers = (f"[{file_} p.{page}]", f"[{base} p.{page}]")
-        if any(marker in answer for marker in exact_markers):
-            cited.add((file_, page))
+    cited = {(h["page"]["file"], h["page"]["page"])
+             for h in _cited_hits(answer, hits)}
     sup = sorted(cited)
     unc = sorted(evidence - cited)
     return {
@@ -172,6 +215,8 @@ def _ground_answer(question, draft, context, vision_notes, visual_warnings):
         "Use only the supplied extracted text and attributed visual observations. "
         "Remove or qualify every claim that the evidence does not directly support. "
         "Preserve correct [filename p.N] citations and never invent citations. "
+        "Keep only sources that directly support the answer; do not discuss or "
+        "cite retrieved candidates that are irrelevant or rejected. "
         "For visual questions, clearly separate 'Direct observations' from "
         "'Interpretation'. Exact names, labels, numbers, positions, and spatial "
         "relationships may appear only when the evidence explicitly says they are "
@@ -386,6 +431,7 @@ def ask(payload: dict):
         "Never say that you cannot embed, show, view, or access an image. "
         "Every factual point must be grounded in the cited pages. Cite each source "
         "using its exact filename and page number as [filename p.N], never the literal word 'file'. "
+        "Do not mention or cite retrieved candidates that do not directly answer the question. "
         "If neither the text nor the successful image observations contain the answer, "
         "say clearly that it is not in the materials and DO NOT invent facts or citations. "
         "Never claim to have inspected an image unless "
@@ -419,9 +465,10 @@ def ask(payload: dict):
 
     answer, grounding_review = _ground_answer(
         question, draft, context, vision_notes, visual_warnings)
+    display_hits = _display_hits(question, answer, hits)
     # Validate the reviewed answer before appending mandatory limitation notices;
     # a warning citation is not evidence that the answer actually used a source.
-    validation = _validate(answer, hits)
+    validation = _validate(answer, display_hits)
     validation["grounding_review"] = grounding_review
     if visual_warnings:
         # Preserve limitations even when the answer model omits them.
@@ -429,7 +476,7 @@ def ask(payload: dict):
 
     return {
         "answer": answer,
-        "sources": [_cite(h["page"], excerpt=h["chunk"]) for h in hits],
+        "sources": [_cite(h["page"], excerpt=h["chunk"]) for h in display_hits],
         "vision_notes": vision_notes,
         "vision_sources": vision_sources,
         "visual_warnings": visual_warnings,

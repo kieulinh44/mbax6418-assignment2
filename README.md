@@ -71,6 +71,11 @@ The full-slide render is analyzed first to preserve layout and spatial context;
 the native details then improve small-label legibility. Slides without usable
 raster details use the full-slide render alone. The displayed evidence remains
 the actual full slide in either case.
+Retrieval remains broad enough to compare candidate evidence internally, but the
+dashboard gallery shows only sources cited by the validated answer. A singular
+visual-locator request such as “Find the meme about Vibe Coding on \"Prod\"”
+shows only the highest-ranked supporting slide; comparison questions can still
+show multiple cited slides.
 Failed image analysis or missing renders produce explicit limitations instead of
 unsupported visual claims. Internal reasoning and truncated model completions
 are never presented as finished answers. Before display, a separate deterministic
