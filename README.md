@@ -168,6 +168,9 @@ one-time CLIP load) for the visual evidence it provides.
 - Dedup is by filename slug only, not content hash (rename ⇒ duplicate).
 - Dark mode — not implemented (requirement is conditional: "if available").
 - Screenshot content never visually verified against the running app.
-- Evaluation deliverable (5-10 question set, two-approach RAG comparison with
-  time + answer correctness + source support) and the SVG architecture diagram
-  are still outstanding.
+- Evaluation: question set + hybrid vs keyword vs vector comparison harness
+  with recorded timings are done (docs/evaluation/questions.json,
+  scripts/eval_retrieval.py, docs/results/evaluation.md); the
+  answer-correctness and source-support columns still need `.env` endpoints +
+  human judgment, and a real-deck run for meaningful numbers. The SVG
+  architecture diagram is done (docs/architecture.svg, embedded above).
