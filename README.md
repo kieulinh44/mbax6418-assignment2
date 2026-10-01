@@ -53,6 +53,8 @@ Then ask: "What is L2 regularization and how does it differ from L1?"
 
 ## Architecture
 
+![Course Assistant architecture](docs/architecture.svg)
+
 **Hybrid RAG** over the course materials:
 
 ```

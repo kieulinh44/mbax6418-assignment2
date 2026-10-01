@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 780" font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#57606a"/>
+    </marker>
+    <marker id="arrB" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#0969da"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="20" y="34" font-size="20" font-weight="700" fill="#24292f">Course Assistant — Architecture</text>
+  <text x="20" y="54" font-size="12.5" fill="#57606a">Hybrid RAG: ingest → three separate indexes → RRF rerank → grounded answer + vision · matches mirina-debug</text>
+
+  <!-- Run-location legend -->
+  <g font-size="11.5">
+    <rect x="20" y="66" width="13" height="13" rx="3" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="38" y="77" fill="#24292f">Runs locally on this machine</text>
+    <rect x="240" y="66" width="13" height="13" rx="3" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="258" y="77" fill="#24292f">Class service endpoints (dobolyi.com:9000 / 9001 — OpenAI-compatible)</text>
+  </g>
+
+  <!-- ============ Row 1: document preparation (local) ============ -->
+  <g>
+    <rect x="20" y="92" width="230" height="74" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="30" y="112" font-size="12.5" font-weight="700" fill="#0969da">📁 Course files</text>
+    <text x="30" y="130" font-size="11" fill="#24292f">data/raw/ · PDF · PPTX · DOCX</text>
+    <text x="30" y="145" font-size="11" fill="#24292f">· MD · TXT — added via /api/upload</text>
+    <text x="30" y="160" font-size="11" fill="#57606a">(downloaded from Canvas)</text>
+
+    <rect x="300" y="92" width="290" height="74" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="310" y="112" font-size="12.5" font-weight="700" fill="#0969da">⚙️ Ingest — app/ingest.py</text>
+    <text x="310" y="130" font-size="11" fill="#24292f">text per page/slide + rendered PNG copies</text>
+    <text x="310" y="145" font-size="11" fill="#24292f">PyMuPDF · python-pptx (+LibreOffice) · python-docx</text>
+    <text x="310" y="160" font-size="11" fill="#57606a">writes data/index/pages.json + page images</text>
+
+    <rect x="640" y="92" width="240" height="74" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="650" y="112" font-size="12.5" font-weight="700" fill="#0969da">🧩 Chunking</text>
+    <text x="650" y="130" font-size="11" fill="#24292f">langchain RecursiveCharacterTextSplitter</text>
+    <text x="650" y="145" font-size="11" fill="#24292f">700 chars / 120 overlap — preserves</text>
+    <text x="650" y="160" font-size="11" fill="#24292f">doc · file · page · section</text>
+
+    <line x1="250" y1="129" x2="300" y2="129" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="590" y1="129" x2="640" y2="129" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ============ Row 2: three separate indexes (local) ============ -->
+  <g>
+    <text x="20" y="200" font-size="12.5" font-weight="700" fill="#24292f">Three separate indexes — kept apart per spec — all in data/index (local)</text>
+
+    <rect x="20" y="210" width="320" height="80" rx="9" fill="#fff8c5" stroke="#9a6700" stroke-width="1.2"/>
+    <text x="30" y="232" font-size="12.5" font-weight="700" fill="#9a6700">1 · Keyword index — bm25s</text>
+    <text x="30" y="250" font-size="11" fill="#24292f">BM25 over chunk tokens (in-memory, built at startup)</text>
+    <text x="30" y="266" font-size="11" fill="#57606a">exact-term recall</text>
+
+    <rect x="380" y="210" width="320" height="80" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="390" y="232" font-size="12.5" font-weight="700" fill="#0969da">2 · Text index — chromadb “text”</text>
+    <text x="390" y="250" font-size="11" fill="#24292f">embeddings: all-MiniLM-L6-v2 (sentence-transformers)</text>
+    <text x="390" y="266" font-size="11" fill="#57606a">semantic recall</text>
+
+    <rect x="740" y="210" width="340" height="80" rx="9" fill="#fbefff" stroke="#8250df" stroke-width="1.2"/>
+    <text x="750" y="232" font-size="12.5" font-weight="700" fill="#8250df">3 · Visual index — chromadb “visual”</text>
+    <text x="750" y="250" font-size="11" fill="#24292f">CLIP clip-ViT-B-32 over every page/slide image</text>
+    <text x="750" y="266" font-size="11" fill="#57606a">cross-modal text → image lookup</text>
+  </g>
+
+  <!-- Row 2 -> RRF arrows -->
+  <line x1="180" y1="290" x2="430" y2="338" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="540" y1="290" x2="500" y2="338" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="900" y1="290" x2="570" y2="338" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ============ Row 3: rerank ============ -->
+  <rect x="330" y="340" width="340" height="70" rx="9" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="340" y="364" font-size="13" font-weight="700" fill="#1a7f37">🔀 RRF rerank (app/hybrid.py)</text>
+  <text x="340" y="383" font-size="11" fill="#24292f">Reciprocal Rank Fusion across the three lists,</text>
+  <text x="340" y="398" font-size="11" fill="#24292f">collapsed to pages: best chunk + original image</text>
+
+  <line x1="500" y1="410" x2="500" y2="450" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ============ Row 4: evidence + answer generation ============ -->
+  <g>
+    <rect x="330" y="452" width="340" height="64" rx="9" fill="#f6f8fa" stroke="#57606a" stroke-width="1.2"/>
+    <text x="340" y="474" font-size="12.5" font-weight="700" fill="#24292f">📄 Best evidence</text>
+    <text x="340" y="492" font-size="11" fill="#24292f">top chunks + their page/slide images</text>
+    <text x="340" y="507" font-size="11" fill="#57606a">(topic / document filters applied before rerank)</text>
+
+    <!-- two branches -->
+    <line x1="500" y1="516" x2="280" y2="560" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arrB)"/>
+    <line x1="500" y1="516" x2="740" y2="560" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arrB)"/>
+
+    <rect x="40" y="562" width="470" height="86" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="50" y="584" font-size="12.5" font-weight="700" fill="#cf222e">👁 Vision pass — Qwen (dobolyi.com:9001)</text>
+    <text x="50" y="602" font-size="11" fill="#24292f">describes diagrams / charts / memes in the images</text>
+    <text x="50" y="618" font-size="11" fill="#57606a">base64 images sent in the request; failure ⇒ notes dropped</text>
+    <text x="50" y="634" font-size="11" fill="#57606a">(needs DOBOLYI_VISION_* env values)</text>
+
+    <rect x="560" y="562" width="520" height="86" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="570" y="584" font-size="12.5" font-weight="700" fill="#cf222e">🧠 Grounded answer — DeepSeek chat (dobolyi.com:9000)</text>
+    <text x="570" y="602" font-size="11" fill="#24292f">answer ONLY from the retrieved material · never invent</text>
+    <text x="570" y="618" font-size="11" fill="#24292f">→ structured {answer, sources, validation}</text>
+    <text x="570" y="634" font-size="11" fill="#57606a">sources checked against evidence (file-name citation check)</text>
+
+    <line x1="275" y1="648" x2="70" y2="688" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="810" y1="648" x2="500" y2="688" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ============ Row 5: output ============ -->
+  <g>
+    <rect x="60" y="690" width="760" height="64" rx="9" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+    <text x="70" y="714" font-size="13" font-weight="700" fill="#1a7f37">💬 FastAPI server + UI (static/index.html)</text>
+    <text x="70" y="733" font-size="11" fill="#24292f">/api/ask · /api/quiz(+grade) · /api/upload · /api/download · /api/files</text>
+    <text x="70" y="748" font-size="11" fill="#57606a">quiz answer key + explanations stay server-side (quiz_id) until answered/revealed</text>
+
+    <rect x="870" y="690" width="210" height="64" rx="9" fill="#fff8c5" stroke="#9a6700" stroke-width="1.2"/>
+    <text x="880" y="714" font-size="11.5" font-weight="700" fill="#9a6700">⚠️ Models unreachable?</text>
+    <text x="880" y="732" font-size="10.5" fill="#24292f">ask → 200 service_unavailable + closest</text>
+    <text x="880" y="746" font-size="10.5" fill="#24292f">evidence · quiz → clear 503</text>
+  </g>
+</svg>
