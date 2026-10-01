@@ -129,6 +129,34 @@ def normalize_retrieval_mode(mode):
     return value
 
 
+def lexical_match_score(query, text):
+    """Give exact query-term matches a small deterministic ranking boost."""
+    query_terms = set(re.findall(r"[a-z0-9]+", query.lower()))
+    text_terms = set(re.findall(r"[a-z0-9]+", text.lower()))
+    if not query_terms:
+        return 0.0
+    matched = query_terms & text_terms
+    score = float(len(matched))
+    if "grading" in query_terms and ({"grading", "percentage", "percent"} & text_terms):
+        score += 2.0
+    if {"breakdown", "grade", "grades"} & query_terms and ({"quiz", "quizzes", "exam", "project", "attendance"} & text_terms):
+        score += 2.0
+    return score
+
+
+def content_depth_factor(text):
+    """Downweight title-only and table-of-contents chunks without removing them."""
+    lowered = text.lower()
+    word_count = len(re.findall(r"[a-z0-9]+", lowered))
+    if word_count <= 6:
+        return 0.15
+    if "topics" in lowered and word_count <= 30:
+        return 0.25
+    if word_count <= 12:
+        return 0.45
+    return 1.0
+
+
 def _is_image_query(query):
     q = query.lower()
     return any(w in q for w in _IMAGE_QUERY_WORDS)
@@ -310,7 +338,11 @@ class Corpus:
         res = self.visual_coll.query(query_embeddings=[qv], n_results=min(top_n, self.visual_coll.count()),
                                      where=where)
         out = []
-        for vid, dist in zip(res["ids"][0], res["distances"][0]):
+        ids = res.get("ids") or []
+        distances = res.get("distances") or []
+        if not ids or not distances or not ids[0] or not distances[0]:
+            return out
+        for vid, dist in zip(ids[0], distances[0]):
             pi = self._page_index_by_visual_id(vid)
             if pi is not None:
                 out.append((pi, 1.0 - float(dist)))
@@ -429,10 +461,22 @@ class Corpus:
                                       k=(len(self.chunks) if requested_page is not None
                                          else min(len(self.chunks), 100)))
         kw = {}
-        for i, s in zip(res.documents[0], res.scores[0]):
-            i = int(i)
-            if i in cand_set:
-                kw[self.chunks[i]["cid"]] = float(s)
+        documents = getattr(res, "documents", None)
+        scores = getattr(res, "scores", None)
+        if documents is None:
+            documents = []
+        if scores is None:
+            scores = []
+        if len(documents) > 0 and len(scores) > 0 and len(documents[0]) > 0 and len(scores[0]) > 0:
+            for i, s in zip(documents[0], scores[0]):
+                i = int(i)
+                if i in cand_set:
+                    kw[self.chunks[i]["cid"]] = float(s)
+        for i in cand_i:
+            boost = lexical_match_score(query, self.chunks[i]["text"])
+            if boost:
+                cid = self.chunks[i]["cid"]
+                kw[cid] = kw.get(cid, 0.0) + boost
         add_stage(kw, 1.0)
 
         # 2) text embeddings (chromadb), filtered to candidates
@@ -442,8 +486,11 @@ class Corpus:
             res = self.text_coll.query(query_embeddings=[qv],
                                        n_results=min(60, max(len(cand_set), 1)),
                                        where=where)
-            txt = {cid: 1.0 - float(d) for cid, d in zip(res["ids"][0], res["distances"][0])
-                   if cid in cand_cids}
+            ids = res.get("ids") or []
+            distances = res.get("distances") or []
+            if ids and distances and ids[0] and distances[0]:
+                txt = {cid: 1.0 - float(d) for cid, d in zip(ids[0], distances[0])
+                       if cid in cand_cids}
             add_stage(txt, 1.0)
         except Exception:
             log.exception("chroma text-embedding query failed")
@@ -487,6 +534,10 @@ class Corpus:
 
         if not fused:
             return []
+        for cid in list(fused):
+            i = cid_to_i.get(cid)
+            if i is not None:
+                fused[cid] *= content_depth_factor(self.chunks[i]["text"])
         ordered = sorted(fused, key=fused.get, reverse=True)
 
         # collapse to pages (best chunk per page), ordered by fused score

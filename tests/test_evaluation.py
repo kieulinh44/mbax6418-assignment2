@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from app import main
-from app.hybrid import normalize_retrieval_mode
+from app.hybrid import Corpus, content_depth_factor, lexical_match_score, normalize_retrieval_mode
 from scripts.compare_retrieval import MODES, QUESTIONS, run_one
 
 
@@ -33,6 +33,49 @@ def test_retrieval_modes_are_validated_and_defaulted():
     assert normalize_retrieval_mode("text_keyword_only") == "text_keyword_only"
     with pytest.raises(ValueError):
         normalize_retrieval_mode("visual_only")
+
+
+def test_grading_terms_receive_an_exact_text_match_boost():
+    score = lexical_match_score(
+        "What is the grading breakdown?",
+        "Course grading: quizzes 20 percent, final project 40 percent, final exam 30 percent, attendance 10 percent.",
+    )
+    assert score >= 5
+
+
+def test_title_only_slide_is_downweighted_against_substantive_content():
+    assert content_depth_factor("Vibe Coding Overview") < content_depth_factor(
+        "Vibe coding uses conversational prompts to explore and refine ideas with a model."
+    )
+
+
+def test_empty_retrieval_results_do_not_raise_index_error():
+    class EmptyBM25:
+        def retrieve(self, *args, **kwargs):
+            return type("Result", (), {"documents": [[]], "scores": [[]]})()
+
+    class EmptyEncoder:
+        def encode(self, query):
+            return type("Vector", (), {"tolist": lambda self: [0.0]})()
+
+    class EmptyTextCollection:
+        def query(self, **kwargs):
+            return {"ids": [[]], "distances": [[]]}
+
+    corpus = Corpus.__new__(Corpus)
+    corpus.chunks = [{
+        "cid": "doc__p1__0", "doc": "doc", "file": "notes.txt", "kind": "txt",
+        "page": 1, "section": None, "text": "A neutral note.", "image": None,
+        "seg": 0, "page_index": 0,
+    }]
+    corpus.pages = [{"doc": "doc", "file": "notes.txt", "kind": "txt", "page": 1,
+                     "section": None, "text": "A neutral note.", "image": None}]
+    corpus.retriever = EmptyBM25()
+    corpus.text_enc = EmptyEncoder()
+    corpus.text_coll = EmptyTextCollection()
+    corpus.visual_coll = type("EmptyVisual", (), {"count": lambda self: 0})()
+
+    assert corpus._retrieve_unlocked("unmatched", retrieval_mode="text_keyword_only") == []
 
 
 def test_api_forwards_default_and_explicit_retrieval_mode(monkeypatch):
