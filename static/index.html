@@ -106,6 +106,25 @@ details.source summary{font-size:12px;color:var(--muted);cursor:pointer}
 footer{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:20px;margin-top:30px;display:flex;gap:12px;justify-content:space-between}
 @media(max-width:600px){header{padding:26px 20px 0}header::after{font-size:56px;right:20px;top:32px}header h1{margin-right:65px}header .contributors{padding:0}.theme-toggle{top:12px;right:20px}.tabs{gap:4px}.tab{padding:9px 14px;font-size:13px}main{padding:24px 16px 36px}.card{padding:20px;border-radius:16px}.row{flex-direction:column;align-items:stretch;gap:6px}.row>div{max-width:none!important}.row button{width:100%;margin-top:10px}.upload-zone{padding:16px}.panel-heading h2{font-size:28px}.step{font-size:42px}.material-row{gap:8px}.mat{width:100%}footer{flex-direction:column;gap:4px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* Retrieved slides are evidence, not generated illustrations. */
+.evidence-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.answer-pane{min-width:0}
+#sources{min-width:0}
+#sources h3{font:400 24px/1.3 var(--serif);margin:0 0 16px}
+.slide-evidence{margin:0 0 20px;padding:16px}
+.slide-evidence figure{margin:0}
+.slide-evidence figcaption{font-size:13px;margin-bottom:12px;overflow-wrap:anywhere}
+.slide-evidence figcaption strong{display:block}
+.slide-evidence img{display:block;width:100%;height:auto;max-height:none;margin:0;border-radius:8px;object-fit:contain;background:white}
+.slide-evidence .slide-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.slide-actions a{color:var(--accent);font-size:12px;text-underline-offset:3px}
+.slide-actions button{margin:0;font-size:12px;padding:9px 13px}
+.slide-evidence details{margin-top:14px;font-size:12px;color:var(--muted)}
+.image-unavailable,.visual-warning{padding:14px;border:1px solid #d4b6a0;border-radius:10px;background:#fbefe1;font-size:13px;color:#624430;overflow-wrap:anywhere}
+#visualWarnings{margin-bottom:20px}
+#visualWarnings:empty{display:none}
+@media(max-width:900px){.evidence-layout{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body>
@@ -142,7 +161,7 @@ footer{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padd
 
   <!-- ================= Q&A ================= -->
   <section class="qa" data-panel="qa" id="panel-qa" role="tabpanel" aria-labelledby="tab-qa">
-    <div class="panel-heading"><div><div class="eyebrow">Follow your curiosity</div><h2>Let’s make it click.</h2><p>Ask a question. Get a clear answer grounded in your course materials.</p></div><span class="step" aria-hidden="true">01</span></div>
+    <div class="panel-heading"><div><div class="eyebrow">Follow your curiosity</div><h2>Let’s make it click.</h2><p>Ask about a concept, picture, diagram, or chart. See the actual slides behind the answer.</p></div><span class="step" aria-hidden="true">01</span></div>
     <div class="card">
 
     <label for="q">Ask a question about the material</label>
@@ -150,13 +169,13 @@ footer{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padd
       <div><label for="doc">Course document</label><select id="doc"><option value="">All documents</option></select></div>
       <div><label for="topic">Topic filter <span class="muted">· optional</span></label><input type="text" id="topic" placeholder="Optional topic filter (e.g. regression)"></div>
     </div>
-    <textarea id="q" placeholder="e.g. What is the intuition behind RAG?"></textarea>
+    <textarea id="q" placeholder="e.g. Explain the RAG diagram, or describe the chart on slide 12."></textarea>
     <button id="askBtn">Ask</button>
     </div>
   </section>
-  <section class="qa" data-panel="qa" id="result" style="display:none">
-    <div class="card answer" id="answer"></div>
-    <div id="sources"></div>
+  <section class="qa evidence-layout" data-panel="qa" id="result" style="display:none" aria-label="Answer and retrieved slides">
+    <div class="answer-pane"><div class="card answer" id="answer" aria-live="polite"></div><div id="visualWarnings" role="status"></div></div>
+    <aside id="sources" aria-label="Retrieved course material"></aside>
   </section>
 
   <!-- ================= QUIZ ================= -->
@@ -254,14 +273,44 @@ async function ask(){
     const data=await r.json();
     if(!r.ok) throw new Error(data.detail||'Question failed');
     $('result').hidden = !document.querySelector('[data-tab="qa"]').classList.contains('active');
-    $('result').style.display='block';
+    $('result').style.display='grid';
     $('answer').textContent=data.answer;
-    const s=$('sources');
-    s.innerHTML=(data.sources||[]).map(c=>`
-      <div class="card cite"><div class="meta"><strong>${esc(c.file)}</strong> · page/slide ${c.page}${c.section?` · ${esc(c.section)}`:''}</div>
-      <pre>${esc(c.excerpt)}</pre>${c.image?`<img src="${esc(c.image)}" alt="page ${c.page}">`:''}</div>`).join('');
+    $('visualWarnings').innerHTML=(data.visual_warnings||[]).map(w=>`<p class="visual-warning">${esc(w)}</p>`).join('');
+    renderSources(data.sources||[]);
   }catch(e){ alert('Error: '+e); }
   finally{ btn.disabled=false; btn.textContent='Ask'; }
+}
+
+
+function renderSources(sources){
+  const el=$('sources');
+  el.innerHTML=sources.length?'<h3>Retrieved slides &amp; pages</h3>':'';
+  el.innerHTML+=sources.map((c,index)=>{
+    const label=c.label || ((c.kind==='pptx'||c.file.endsWith('.pptx'))?'Slide ':'Page ')+c.page;
+    const image=c.image&&c.image.startsWith('/pages/')?c.image:null;
+    const caption=`<strong>${esc(c.file)}</strong><span class="muted">${esc(label)}${c.section?' · '+esc(c.section):''}</span>`;
+    return `<article class="card slide-evidence"><figure>
+      <figcaption>${caption}</figcaption>
+      ${image?`<a href="${esc(image)}" target="_blank" rel="noopener" aria-label="Open ${esc(c.file)} ${esc(label)} full size"><img src="${esc(image)}" alt="Actual ${esc(label.toLowerCase())} from ${esc(c.file)}" loading="lazy"></a>`:`<div class="image-unavailable">${c.kind==='pptx'?'Slide image is not available for this document.':'No rendered page image is available for this source.'} The answer can use its extracted text only.</div>`}
+      </figure>
+      <div class="slide-actions">${image?`<a href="${esc(image)}" target="_blank" rel="noopener">Open full-size image ↗</a><button class="ghost explain-slide" data-source="${index}">Explain this ${c.kind==='pptx'?'slide':'page'}</button>`:''}</div>
+      ${c.excerpt?`<details><summary>Retrieved text excerpt</summary><pre>${esc(c.excerpt)}</pre></details>`:''}
+      </article>`;
+  }).join('');
+  el.querySelectorAll('.explain-slide').forEach(button=>button.onclick=()=>{
+    const source=sources[Number(button.dataset.source)];
+    $('doc').value=source.doc;
+    $('topic').value='';
+    $('q').value=`Explain ${source.kind==='pptx'?'slide':'page'} ${source.page}, including any pictures, diagrams, and charts. Describe what is visible and explain it using the retrieved course materials.`;
+    switchTab('qa');
+    ask();
+  });
+  el.querySelectorAll('img').forEach(image=>image.onerror=()=>{
+    const notice=document.createElement('div');
+    notice.className='image-unavailable';
+    notice.textContent='This slide image could not be loaded. Try asking again or re-indexing the document.';
+    image.closest('a').replaceWith(notice);
+  });
 }
 
 /* ---------- QUIZ ---------- */
@@ -328,7 +377,7 @@ async function grade(revealOnly){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>{
     const active=t.dataset.tab===name;
