@@ -114,16 +114,18 @@ class VisualDetailImagesTests(unittest.TestCase):
         with patch.object(main.config, "DATA_INDEX", str(self.raw)), \
                 patch.object(main.hybrid, "get_corpus") as corpus, \
                 patch.object(main.llm, "chat", return_value="Answer [lecture.pptx p.1]"), \
+                patch.object(main.llm, "ground", return_value="Answer [lecture.pptx p.1]"), \
                 patch.object(main.llm, "vision", return_value="Two chart observations") as vision:
             corpus.return_value.retrieve.return_value = [{"page": page, "chunk": page["text"]}]
             result = main.ask({"question": "Read the small chart labels"})
         prompt, images = vision.call_args.args
-        self.assertNotIn(self.full, images)
-        self.assertEqual(len(images), 2)
-        self.assertEqual([decode(uri).size for uri in images], [(1024, 512)] * 2)
+        self.assertEqual(images[0], self.full)
+        self.assertEqual(len(images), 3)
+        self.assertEqual([decode(uri).size for uri in images[1:]], [(1024, 512)] * 2)
         self.assertIn("exact slide", prompt.lower())
         self.assertIn("not separate sources", prompt.lower())
         self.assertIn("native-resolution", prompt.lower())
+        self.assertIn("complete retrieved slide", prompt.lower())
         self.assertIn("unreadable labels", prompt)
         self.assertEqual(result["vision_sources"], [{"file": "lecture.pptx", "page": 1,
                          "status": "success", "notes": "Two chart observations"}])

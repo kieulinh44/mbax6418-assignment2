@@ -18,6 +18,7 @@ class VisualAnswersTests(unittest.TestCase):
         patch.object(main.config, "DATA_INDEX", str(self.index)).start()
         self.corpus = patch.object(main.hybrid, "get_corpus").start().return_value
         self.chat = patch.object(main.llm, "chat", return_value="Grounded answer").start()
+        self.ground = patch.object(main.llm, "ground", return_value="Grounded answer").start()
         self.vision = patch.object(main.llm, "vision", side_effect=self.describe).start()
 
     @staticmethod
@@ -94,9 +95,14 @@ class VisualAnswersTests(unittest.TestCase):
         self.assertIn("interpretation", prompt.lower())
         self.assertIn("unreadable labels", prompt.lower())
         self.assertIn("numbers", prompt.lower())
+        self.assertIn("uncertain or unreadable", prompt.lower())
         system = self.chat.call_args.args[0][0]["content"]
         self.assertIn("observation", system.lower())
         self.assertIn("interpretation", system.lower())
+        self.assertIn("automatically displays", system.lower())
+        review_system = self.ground.call_args.args[0][0]["content"]
+        self.assertIn("strict evidence editor", review_system.lower())
+        self.assertIn("never say that you cannot embed", review_system.lower())
         self.assertEqual(result["visual_warnings"], [])
         self.assertEqual(result["answer"], "Grounded answer")
 
@@ -113,17 +119,18 @@ class VisualAnswersTests(unittest.TestCase):
         evidence = messages[1]['content']
         self.assertIn('COURSE EVIDENCE', evidence)
         self.assertLess(evidence.index('COURSE EVIDENCE'), evidence.index(self.vision.return_value))
-        self.assertIn('model/version names or exact data points only when the question asks', self.vision.call_args.args[0])
+        self.assertIn('exact names, labels, positions, spatial relationships, or data points only when they are clearly legible',
+                      self.vision.call_args.args[0])
 
-    def test_native_picture_details_are_analyzed_without_downsized_duplicates(self):
+    def test_full_slide_layout_and_native_picture_detail_are_analyzed_together(self):
         hit = self.hit(7)
         self.corpus.retrieve.return_value = [hit]
         full = str(self.index / hit['page']['image'])
         detail = 'data:image/png;base64,bmF0aXZlLWZpeHR1cmU='
         with patch.object(main, '_slide_vision_images', return_value=[full, detail]):
             main.ask({'question':'Explain the chart on slide 7.'})
-        self.assertEqual(self.vision.call_args.args[1], [detail])
-        self.assertNotIn('first image is the whole', self.vision.call_args.args[0])
+        self.assertEqual(self.vision.call_args.args[1], [full, detail])
+        self.assertIn('first image is the complete', self.vision.call_args.args[0].lower())
 
     def test_no_hits_returns_empty_visual_metadata_without_model_calls(self):
         self.corpus.retrieve.return_value = []
@@ -134,6 +141,7 @@ class VisualAnswersTests(unittest.TestCase):
         self.assertEqual(result["sources"], [])
         self.vision.assert_not_called()
         self.chat.assert_not_called()
+        self.ground.assert_not_called()
 
     def test_empty_visual_response_is_a_failed_analysis(self):
         self.corpus.retrieve.return_value = [self.hit(1)]
@@ -171,6 +179,75 @@ class VisualAnswersTests(unittest.TestCase):
         result = main.ask({"question": "Explain the missing chart"})
         self.assertEqual(result["validation"]["sources_used"], [])
         self.assertFalse(result["validation"]["all_sources_supported"])
+
+    def test_requirement_2_sources_keep_exact_week2_slide_and_image_url(self):
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        cases = [
+            (33, 'Find the meme about Vibe Coding on "Prod".'),
+            (7, "Explain the Benchmark Evaluation charts."),
+        ]
+        for slide, question in cases:
+            with self.subTest(slide=slide):
+                self.vision.reset_mock()
+                self.chat.reset_mock()
+                self.ground.reset_mock()
+                hit = self.hit(slide, file=filename)
+                self.corpus.retrieve.return_value = [hit]
+                answer = f"Supported answer [{filename} p.{slide}]"
+                self.chat.return_value = answer
+                self.ground.return_value = answer
+                result = main.ask({"question": question})
+                self.assertEqual(len(result["sources"]), 1)
+                self.assertEqual(result["sources"][0]["file"], filename)
+                self.assertEqual(result["sources"][0]["page"], slide)
+                self.assertEqual(result["sources"][0]["label"], f"Slide {slide}")
+                self.assertEqual(result["sources"][0]["image"],
+                                 f"/pages/slide-{slide}.png")
+                self.assertTrue(result["validation"]["all_sources_supported"])
+
+    def test_unsupported_visual_claims_are_revised_before_return(self):
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        self.corpus.retrieve.return_value = [self.hit(7, file=filename)]
+        unsupported = f"The top chart proves Model Z costs $99 [{filename} p.7]"
+        revised = (
+            "Direct observations: The left chart is Intelligence and the right chart "
+            f"is Cost per Task.\n\nInterpretation: The slide compares performance and cost "
+            f"[{filename} p.7]"
+        )
+        self.chat.return_value = unsupported
+        self.ground.return_value = revised
+        result = main.ask({"question": "Explain slide 7"})
+        self.assertEqual(result["answer"], revised)
+        self.assertNotIn("Model Z", result["answer"])
+        self.assertNotIn("$99", result["answer"])
+        self.assertEqual(result["validation"]["grounding_review"]["outcome"],
+                         "revised")
+        review = self.ground.call_args.args[0][1]["content"]
+        self.assertIn(unsupported, review)
+        self.assertIn("ATTRIBUTED VISUAL OBSERVATIONS", review)
+
+    def test_wrong_slide_number_does_not_pass_citation_validation(self):
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        self.corpus.retrieve.return_value = [self.hit(33, file=filename)]
+        wrong = f"Meme explanation [{filename} p.7]"
+        self.chat.return_value = wrong
+        self.ground.return_value = wrong
+        result = main.ask({"question": "Explain the meme on slide 33"})
+        self.assertEqual(result["validation"]["sources_used"], [])
+        self.assertEqual(result["validation"]["sources_not_cited"],
+                         [{"file": filename, "page": 33}])
+        self.assertFalse(result["validation"]["all_sources_supported"])
+
+    def test_failed_grounding_review_rejects_unvalidated_draft(self):
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        self.corpus.retrieve.return_value = [self.hit(33, file=filename)]
+        self.chat.return_value = f"Unsupported celebrity claim [{filename} p.33]"
+        self.ground.side_effect = RuntimeError("validator unavailable")
+        result = main.ask({"question": "Explain the meme on slide 33"})
+        self.assertNotIn("Unsupported celebrity claim", result["answer"])
+        self.assertIn("could not be validated", result["answer"])
+        self.assertEqual(result["validation"]["grounding_review"],
+                         {"checked": True, "outcome": "rejected"})
 
 
 if __name__ == "__main__":

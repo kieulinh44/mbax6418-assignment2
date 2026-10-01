@@ -52,6 +52,12 @@ def chat(messages, max_tokens=4096, temperature=0.2):
                      messages, max_tokens=max_tokens, temperature=temperature)
 
 
+def ground(messages, max_tokens=4096):
+    """Run a second, low-temperature pass that edits an answer for evidence support."""
+    return _complete(config.CHAT_BASE, config.CHAT_KEY, config.CHAT_MODEL,
+                     messages, max_tokens=max_tokens, temperature=0.0)
+
+
 def vision(prompt, image_paths, max_tokens=4096):
     """Ask the vision model (Qwen) about one or more page images."""
     content = [{"type": "text", "text": prompt}]

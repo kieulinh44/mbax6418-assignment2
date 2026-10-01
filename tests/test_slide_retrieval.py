@@ -55,6 +55,37 @@ class SlideRetrievalTests(unittest.TestCase):
     def retrieve(self, query, **kwargs):
         return self.corpus._retrieve_unlocked(query, top_k=10, **kwargs)
 
+    def requirement_2_fixture(self):
+        """Use real requirement labels and the real keyword retriever."""
+        import bm25s
+
+        doc = "mbax-6418-week-2-llm-fundamentals-v2"
+        filename = "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx"
+        rows = [
+            (7, "Benchmark Evaluation Intelligence Cost per Task"),
+            (33, 'Vibe Coding on "Prod"'),
+            (27, "Vibe Coding Overview"),
+        ]
+        self.corpus.pages = [
+            {"doc": doc, "file": filename, "page": page, "kind": "pptx",
+             "text": text, "image": f"week2-{page}.png"}
+            for page, text in rows
+        ]
+        self.corpus.chunks = [
+            {**page, "cid": f"{doc}__p{page['page']}__0", "section": None,
+             "page_index": i}
+            for i, page in enumerate(self.corpus.pages)
+        ]
+        tokens = bm25s.tokenize([chunk["text"] for chunk in self.corpus.chunks],
+                                stopwords="en")
+        self.corpus.retriever = bm25s.BM25()
+        self.corpus.retriever.index(tokens)
+        self.corpus.text_coll.query.return_value = {
+            "ids": [[]], "distances": [[]],
+        }
+        self.corpus.visual_coll.count.return_value = 0
+        return doc, filename
+
     def test_explicit_slide_survives_each_indexes_global_cutoff(self):
         # The target ranks 126th: outside BM25's 100, CLIP's 20, and
         # text retrieval's one-result limit for a single candidate chunk.
@@ -183,6 +214,23 @@ class SlideRetrievalTests(unittest.TestCase):
         self.corpus.text_coll.query.assert_called_once()
         self.clip.encode.assert_called_once_with("Explain slide 12")
         self.corpus.visual_coll.query.assert_called_once()
+
+    def test_requirement_2_meme_query_retrieves_week2_slide_33_first(self):
+        doc, filename = self.requirement_2_fixture()
+        hits = self.retrieve('Find the meme about Vibe Coding on "Prod".', doc=doc)
+        self.assertEqual((hits[0]["page"]["file"], hits[0]["page"]["page"]),
+                         (filename, 33))
+        self.assertEqual(hits[0]["page"]["image"], "week2-33.png")
+
+    def test_requirement_2_chart_query_retrieves_week2_slide_7_first(self):
+        doc, filename = self.requirement_2_fixture()
+        hits = self.retrieve(
+            "Find the Benchmark Evaluation Intelligence and Cost per Task charts.",
+            doc=doc,
+        )
+        self.assertEqual((hits[0]["page"]["file"], hits[0]["page"]["page"]),
+                         (filename, 7))
+        self.assertEqual(hits[0]["page"]["image"], "week2-7.png")
 
 
 if __name__ == "__main__":
