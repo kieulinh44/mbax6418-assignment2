@@ -94,7 +94,9 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
         raw = llm.chat([{"role": "system", "content": sys},
                         {"role": "user", "content": user}], max_tokens=max_tokens)
     except Exception as e:
-        raise RuntimeError(f"Quiz generation model call failed: {e}")
+        # Model service down: report honestly; exception type only — never leak
+        # the raw exception/URL into the API response.
+        raise RuntimeError(f"model service unavailable ({type(e).__name__})") from e
     data = _extract_json(raw)
     questions = []
     look = _build_lookup(hits)
