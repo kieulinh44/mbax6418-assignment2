@@ -17,6 +17,7 @@ Indexes are cached in data/index/ (gitignored) so server startup is fast.
 import json
 import logging
 import os
+import re
 
 import numpy as np
 
@@ -289,14 +290,15 @@ class Corpus:
                 return i
         return None
 
-    def _visual_page_hits(self, query, doc, top_n=20):
+    def _visual_page_hits(self, query, doc, top_n=20, where=None):
         """Cross-modal text->image query over the visual index.
         Returns [(page_index, similarity), ...] ordered by similarity."""
         if not self.visual_coll.count():
             return []
         clip = _clip_model()
         qv = clip.encode(query).tolist()
-        where = {"doc": doc} if doc else None
+        if where is None:
+            where = {"doc": doc} if doc else None
         res = self.visual_coll.query(query_embeddings=[qv], n_results=min(top_n, self.visual_coll.count()),
                                      where=where)
         out = []
@@ -369,12 +371,33 @@ class Corpus:
         if not self.chunks:
             return []
         cand_i = self._candidate_chunk_ids(doc, topic)
+        requested_page = None
+        # Only an unambiguous singular reference narrows the search. Multiple
+        # references, numeric lists/ranges and decimals keep normal hybrid RAG.
+        references = list(re.finditer(
+            r"\b(?:slide|page)\s+(?:number\s+|#\s*)?(\d+)\b",
+            query, re.IGNORECASE))
+        if len(references) == 1:
+            requested = references[0]
+            continuation = query[requested.end():]
+            ambiguous = re.match(
+                r"\s*(?:[-–—,./&]|\b(?:to|through|and|or)\b)\s*#?\s*\d",
+                continuation, re.IGNORECASE)
+            if not ambiguous:
+                requested_page = int(requested.group(1))
+                cand_i = [i for i in cand_i if self.chunks[i]["page"] == requested_page]
         cand_set = set(cand_i)
         cand_cids = {self.chunks[i]["cid"] for i in cand_i}
-        cand_pages = self._candidate_page_set(doc, topic)
+        cand_pages = {self.chunks[i]["page_index"] for i in cand_i}
         cid_to_i = {c["cid"]: i for i, c in enumerate(self.chunks)}
         if not cand_set:
             return []
+
+        # Apply explicit page constraints inside Chroma, before bounded top-k.
+        where = {"doc": doc} if doc else None
+        if requested_page is not None:
+            page_filter = {"page": requested_page}
+            where = {"$and": [where, page_filter]} if where else page_filter
 
         import bm25s
         fused = {}  # cid -> weighted fused score
@@ -392,7 +415,8 @@ class Corpus:
 
         # 1) keyword (BM25) — raw scores preserve dominance
         res = self.retriever.retrieve(bm25s.tokenize([query], stopwords="en"),
-                                      k=min(len(self.chunks), 100))
+                                      k=(len(self.chunks) if requested_page is not None
+                                         else min(len(self.chunks), 100)))
         kw = {}
         for i, s in zip(res.documents[0], res.scores[0]):
             i = int(i)
@@ -402,7 +426,6 @@ class Corpus:
 
         # 2) text embeddings (chromadb), filtered to candidates
         qv = self.text_enc.encode(query).tolist()
-        where = {"doc": doc} if doc else None
         txt = {}
         try:
             res = self.text_coll.query(query_embeddings=[qv],
@@ -420,7 +443,7 @@ class Corpus:
         try:
             image_query = _is_image_query(query)
             vis_weight = 1.0 if image_query else 0.35
-            v_pages = self._visual_page_hits(query, doc)
+            v_pages = self._visual_page_hits(query, doc, where=where)
             if not image_query:
                 surfaced = set()
                 for cid in kw:
@@ -434,7 +457,8 @@ class Corpus:
                 v_pages = [(pi, s) for pi, s in v_pages if pi in surfaced]
             v_pages = [(pi, s) for pi, s in v_pages if pi in cand_pages]
             page_chunks = {}
-            for i, ch in enumerate(self.chunks):
+            for i in cand_i:
+                ch = self.chunks[i]
                 page_chunks.setdefault(ch["page_index"], []).append(ch["cid"])
             vis = {}
             for pi, sim in v_pages:
