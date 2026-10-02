@@ -134,6 +134,39 @@ answers, sources, validation, and Question 9's missing-information behavior in
 `docs/evaluation_results.json`. Correctness and source support require manual
 review; the script does not fabricate evaluation outcomes.
 
+### Evaluation question set
+
+The same locally indexed syllabus and Week 2–5 slides were used for both
+retrieval approaches. The nine evaluation questions were:
+
+1. What is the grading breakdown for MBAX 6418?
+2. How is attendance and participation evaluated?
+3. What makes a good few-shot example in prompt engineering?
+4. What is Retrieval Augmented Generation (RAG), and why is it useful?
+5. Why are commits useful when debugging, according to the Week 4 material?
+6. What is vibe coding?
+7. What does the flowchart on the “What Is RAG?” slide show?
+8. Explain the “One Does Not Simply” meme on the Week 2 “Vibe Coding on
+   ‘Prod’” slide. Which meme format is it, and what point does it make?
+9. What is the professor's favorite programming language?
+
+Questions 1–2 test the syllabus; Questions 3–6 test slide text; Questions 7–8
+require visual evidence; and Question 9 is intentionally unanswerable. The
+complete expected behavior is also in [docs/EVALUATION.md](docs/EVALUATION.md).
+
+### Evaluation results and interpretation
+
+Using the same locally indexed syllabus and Week 2–5 course slides, both
+retrieval modes answered all nine manually reviewed questions correctly with
+supported sources. Hybrid retrieval averaged **7.925 seconds**, compared with
+**9.719 seconds** for text-and-keyword-only retrieval. Its clearest advantage
+was the visual meme question (6.121 seconds versus 22.162 seconds).
+
+We keep **hybrid retrieval** because it retains visual evidence for diagrams
+and memes while also performing faster in this evaluation run. The full
+per-question comparison, manual source review, timings, and validation notes
+are in [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md).
+
 ## Setup
 ```bash
 python -m venv .venv
