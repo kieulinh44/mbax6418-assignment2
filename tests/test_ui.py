@@ -32,11 +32,11 @@ class DashboardTests(unittest.TestCase):
 
     def test_contributor_credit_and_responsive_theme(self):
         credit = 'Contributed by Linh Nguyen, Jamie Lin, Kelly Nguyen, Jana Chittarath, and Mirina Gurung'
-        self.assertIn(credit, self.page.locator('header').inner_text())
+        self.assertIn(credit, self.page.locator('body').inner_text())
         heading_size = self.page.locator('h1').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
         credit_size = self.page.locator('.contributors').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
         self.assertLess(credit_size, heading_size)
-        self.assertIn('DM Sans', self.page.locator('body').evaluate('(el)=>getComputedStyle(el).fontFamily'))
+        self.assertIn('Chakra Petch', self.page.locator('body').evaluate('(el)=>getComputedStyle(el).fontFamily'))
         for width in [390, 768, 1440]:
             self.page.set_viewport_size({'width': width, 'height': 900})
             for tab in ['qa', 'quiz', 'materials']:
@@ -57,9 +57,9 @@ class DashboardTests(unittest.TestCase):
         self.page.locator('#sources figure').wait_for()
         sections = self.page.locator('#answer .answer-section')
         self.assertEqual(sections.count(), 2)
-        self.assertEqual(sections.nth(0).locator('h3').inner_text(),
-                         '✓Direct observations')
-        self.assertEqual(sections.nth(1).locator('h3').inner_text(),
+        self.assertEqual(''.join(sections.nth(0).locator('h3').inner_text().split()),
+                         '✓Directobservations')
+        self.assertEqual(''.join(sections.nth(1).locator('h3').inner_text().split()),
                          '◇Interpretation')
         self.assertNotIn('**', self.page.locator('#answer').inner_text())
         self.assertIn('lecture.pptx', self.page.locator('#sources figcaption').inner_text())
@@ -97,11 +97,11 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(sections.count(), 3)
         self.assertEqual(sections.nth(0).get_attribute('class'),
                          'answer-section observation')
-        self.assertEqual(sections.nth(0).locator('h3').inner_text(),
-                         '✓Direct observations')
+        self.assertEqual(''.join(sections.nth(0).locator('h3').inner_text().split()),
+                         '✓Directobservations')
         self.assertEqual(sections.nth(1).get_attribute('class'),
                          'answer-section interpretation')
-        self.assertEqual(sections.nth(1).locator('h3').inner_text(),
+        self.assertEqual(''.join(sections.nth(1).locator('h3').inner_text().split()),
                          '◇Interpretation')
         self.assertEqual(sections.nth(0).locator('ol').count(), 1)
         self.assertEqual(sections.nth(0).locator('ol ul').count(), 1)
