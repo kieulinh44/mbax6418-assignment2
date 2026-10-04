@@ -90,5 +90,5 @@ def test_model_failure_raises_runtime_error(monkeypatch):
         raise ConnectionError("endpoint down")
 
     monkeypatch.setattr(quiz.llm, "chat", boom)
-    with pytest.raises(RuntimeError, match="model call failed"):
+    with pytest.raises(RuntimeError, match="model service unavailable"):
         quiz.generate_quiz(question_theme="RAG", n=1)
