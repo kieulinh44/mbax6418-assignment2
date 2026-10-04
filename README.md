@@ -203,6 +203,8 @@ explanations match the retrieved course slides.
 
 ## Architecture
 
+![Course Assistant architecture](docs/architecture.svg)
+
 **Hybrid RAG** over the course materials:
 
 ```

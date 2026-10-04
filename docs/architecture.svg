@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 900" font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#57606a"/>
+    </marker>
+    <marker id="arrR" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#cf222e"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="20" y="32" font-size="20" font-weight="700" fill="#24292f">Course Assistant — Architecture</text>
+  <text x="20" y="52" font-size="12.5" fill="#57606a">Hybrid RAG: ingest → three separate indexes → fused rerank → grounded answer + vision · matches the final app (meme search, dark mode, quiz, upload/remove)</text>
+
+  <!-- Run-location legend -->
+  <g font-size="11.5">
+    <rect x="20" y="64" width="13" height="13" rx="3" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="38" y="75" fill="#24292f">Runs locally on the machine (data + indexes + app)</text>
+    <rect x="340" y="64" width="13" height="13" rx="3" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="358" y="75" fill="#24292f">Class service endpoints — OpenAI-compatible (ports 9000 / 9001), configured via .env</text>
+  </g>
+
+  <!-- ============ Row 1: materials + ingest (local) ============ -->
+  <g>
+    <rect x="20" y="92" width="250" height="86" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="30" y="112" font-size="12.5" font-weight="700" fill="#0969da">📁 Course materials</text>
+    <text x="30" y="130" font-size="11" fill="#24292f">data/raw/ — PDF · PPTX · DOCX · MD · TXT</text>
+    <text x="30" y="145" font-size="11" fill="#24292f">from Canvas · upload / download / remove</text>
+    <text x="30" y="160" font-size="11" fill="#57606a">duplicates refused · removal purges content</text>
+
+    <rect x="320" y="92" width="270" height="86" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="330" y="112" font-size="12.5" font-weight="700" fill="#0969da">⚙️ Ingest — app/ingest.py</text>
+    <text x="330" y="130" font-size="11" fill="#24292f">text per page/slide + rendered PNG copies</text>
+    <text x="330" y="145" font-size="11" fill="#24292f">PyMuPDF · python-pptx (+LibreOffice) · python-docx</text>
+    <text x="330" y="160" font-size="11" fill="#57606a">writes data/index/pages.json + page images</text>
+
+    <rect x="640" y="92" width="230" height="86" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="650" y="112" font-size="12.5" font-weight="700" fill="#0969da">🧩 Chunking</text>
+    <text x="650" y="130" font-size="11" fill="#24292f">langchain RecursiveCharacterTextSplitter</text>
+    <text x="650" y="145" font-size="11" fill="#24292f">700 chars / 120 overlap — deterministic ids,</text>
+    <text x="650" y="160" font-size="11" fill="#24292f">doc · file · page · section preserved</text>
+
+    <line x1="270" y1="135" x2="320" y2="135" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="590" y1="135" x2="640" y2="135" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ============ Row 2: three separate indexes (local) ============ -->
+  <g>
+    <text x="20" y="212" font-size="12.5" font-weight="700" fill="#24292f">Three separate indexes — kept apart per the spec — all in data/index (local; incremental on upload, purged on remove)</text>
+
+    <rect x="20" y="222" width="320" height="82" rx="9" fill="#fff8c5" stroke="#9a6700" stroke-width="1.2"/>
+    <text x="30" y="244" font-size="12.5" font-weight="700" fill="#9a6700">1 · Keyword index — bm25s</text>
+    <text x="30" y="262" font-size="11" fill="#24292f">BM25 over chunk tokens (in-memory, rebuilt at startup)</text>
+    <text x="30" y="278" font-size="11" fill="#57606a">exact-term recall</text>
+
+    <rect x="380" y="222" width="320" height="82" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="390" y="244" font-size="12.5" font-weight="700" fill="#0969da">2 · Text index — chromadb “text”</text>
+    <text x="390" y="262" font-size="11" fill="#24292f">all-MiniLM-L6-v2 embeddings (sentence-transformers)</text>
+    <text x="390" y="278" font-size="11" fill="#57606a">semantic recall</text>
+
+    <rect x="740" y="222" width="340" height="82" rx="9" fill="#fbefff" stroke="#8250df" stroke-width="1.2"/>
+    <text x="750" y="244" font-size="12.5" font-weight="700" fill="#8250df">3 · Visual index — chromadb “visual”</text>
+    <text x="750" y="262" font-size="11" fill="#24292f">CLIP clip-ViT-B-32 over every page/slide image</text>
+    <text x="750" y="278" font-size="11" fill="#57606a">cross-modal text → image lookup</text>
+  </g>
+
+  <!-- indexes -> retrieval -->
+  <line x1="180" y1="304" x2="420" y2="352" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="540" y1="304" x2="510" y2="352" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="900" y1="304" x2="590" y2="352" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ============ Row 3: retrieval + rerank ============ -->
+  <g>
+    <rect x="300" y="354" width="400" height="92" rx="9" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+    <text x="310" y="376" font-size="13" font-weight="700" fill="#1a7f37">🔎 Retrieval + weighted score fusion (rerank)</text>
+    <text x="310" y="395" font-size="11" fill="#24292f">week-scope &amp; doc/topic filters apply first, then all three indexes run</text>
+    <text x="310" y="411" font-size="11" fill="#24292f">min-max normalized BM25 + text-cosine + visual-cosine, weighted sum</text>
+    <text x="310" y="427" font-size="11" fill="#57606a">collapsed to pages: best chunk + original slide image per source</text>
+
+    <rect x="740" y="354" width="280" height="92" rx="9" fill="#fbefff" stroke="#8250df" stroke-width="1.2"/>
+    <text x="750" y="376" font-size="12" font-weight="700" fill="#8250df">😆 Meme collections</text>
+    <text x="750" y="393" font-size="11" fill="#24292f">“find all memes”: exhaustive per-slide</text>
+    <text x="750" y="408" font-size="11" fill="#24292f">visual classification; confirmed matches</text>
+    <text x="750" y="423" font-size="11" fill="#57606a">gallery in slide order; decisions cached (gitignored)</text>
+  </g>
+
+  <line x1="500" y1="446" x2="500" y2="480" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ============ Row 4: evidence + answer generation ============ -->
+  <g>
+    <rect x="330" y="482" width="340" height="58" rx="9" fill="#f6f8fa" stroke="#57606a" stroke-width="1.2"/>
+    <text x="340" y="504" font-size="12.5" font-weight="700" fill="#24292f">📄 Best evidence</text>
+    <text x="340" y="522" font-size="11" fill="#24292f">top chunks + their page/slide images (source labels)</text>
+
+    <line x1="500" y1="540" x2="270" y2="582" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arrR)"/>
+    <line x1="500" y1="540" x2="760" y2="582" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arrR)"/>
+
+    <rect x="36" y="584" width="460" height="96" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="46" y="606" font-size="12.5" font-weight="700" fill="#cf222e">👁 Vision pass — Qwen (class endpoint :9001)</text>
+    <text x="46" y="624" font-size="11" fill="#24292f">up to 3 retrieved images in parallel; native-resolution embedded</text>
+    <text x="46" y="639" font-size="11" fill="#24292f">pictures + full-slide render; failure ⇒ explicit limitations</text>
+    <text x="46" y="654" font-size="11" fill="#57606a">attributed observations become course evidence (vision_sources)</text>
+
+    <rect x="560" y="584" width="520" height="96" rx="9" fill="#ffeef0" stroke="#cf222e" stroke-width="1.2"/>
+    <text x="570" y="606" font-size="12.5" font-weight="700" fill="#cf222e">🧠 Grounded answer — DeepSeek chat (class endpoint :9000)</text>
+    <text x="570" y="624" font-size="11" fill="#24292f">answers ONLY from retrieved text + successful image observations</text>
+    <text x="570" y="639" font-size="11" fill="#24292f">grounding review revises unsupported claims before display</text>
+    <text x="570" y="654" font-size="11" fill="#57606a">never invents facts or citations; missing info acknowledged</text>
+
+    <line x1="266" y1="680" x2="80" y2="726" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="820" y1="680" x2="500" y2="726" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ============ Row 5: API + UI + quiz ============ -->
+  <g>
+    <rect x="50" y="728" width="720" height="82" rx="9" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+    <text x="60" y="752" font-size="13" font-weight="700" fill="#1a7f37">💬 FastAPI server + dashboard (static UI)</text>
+    <text x="60" y="772" font-size="11" fill="#24292f">/api/ask · /api/quiz(+grade/reveal) · /api/upload · /api/download · /api/documents (remove)</text>
+    <text x="60" y="788" font-size="11" fill="#57606a">Q&amp;A + Practice Quiz + Materials tabs · light/dark arcade themes · slide gallery with doc name + slide N</text>
+
+    <rect x="820" y="728" width="250" height="82" rx="9" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+    <text x="830" y="752" font-size="12" font-weight="700" fill="#0969da">📝 Quiz key kept server-side</text>
+    <text x="830" y="770" font-size="11" fill="#24292f">answer_idx + explanations stored by quiz_id;</text>
+    <text x="830" y="786" font-size="11" fill="#24292f">revealed only on answer / reveal request</text>
+  </g>
+
+  <!-- fallback note -->
+  <text x="50" y="846" font-size="11.5" fill="#9a6700">⚠️ Models unreachable? ask → 200 with service_unavailable + retrieved evidence (incl. slide images) · quiz → clear 503. No crashes, no invented answers.</text>
+</svg>
