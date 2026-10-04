@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, llm, quiz, hybrid
+from . import config, llm, quiz, hybrid, visual_search
 
 app = FastAPI(title="Course Assistant")
 app.add_middleware(CORSMiddleware,
@@ -343,6 +343,47 @@ def ask(payload: dict):
         raise HTTPException(400, "question is required")
 
     try:
+        retrieval_mode = hybrid.normalize_retrieval_mode(retrieval_mode)
+        if retrieval_mode == 'hybrid' and visual_search.is_meme_collection(question):
+            result = visual_search.search_memes(
+                question, hybrid.load_pages(), doc=doc, topic=topic)
+            coverage = result['coverage']
+            matches = result['matches']
+            if not coverage['total']:
+                answer = ('No slides match the requested document/week and filters. '
+                          'Check the selected document and topic filter; I did not search unrelated files.')
+            else:
+                files = ', '.join(result['files'])
+                answer = (f"**Direct observations**\n\nVisually reviewed {coverage['reviewed']} of "
+                          f"{coverage['total']} slides/pages in {files}. "
+                          f"Found {len(matches)} slides containing a meme or humorous visual.")
+                for p in matches:
+                    answer += (f"\n\n- **Slide {p['page']}**: {p['visual_description']} "
+                               f"[{p['file']} p.{p['page']}]")
+                if not coverage['complete']:
+                    answer += ('\n\n**Search incomplete:** Some images could not be classified '
+                               'confidently. This is not a complete list of all memes.')
+                else:
+                    answer += ('\n\nAll eligible slides were inspected; these are the visual '
+                               'classifier’s matches, not just the highest-ranked search results.')
+                answer += ('\n\n**Interpretation**\n\nMemes include captioned reaction images '
+                           'and humorous visual comparisons; ordinary charts, logos and technical '
+                           'screenshots are excluded. Review the original slides alongside the result.')
+            warnings = [f"[{p['file']} p.{p['page']}] {p['description']}"
+                        for p in result['limitations']]
+            if warnings:
+                answer += '\n\nVisual limitations:\n' + '\n'.join(warnings)
+            return {
+                'answer': answer,
+                'sources': [_cite(p, excerpt=p.get('text','')) for p in matches],
+                'vision_notes': '\n\n'.join(f"[{p['file']} p.{p['page']}] {p['visual_description']}" for p in matches),
+                'vision_sources': [{'file':p['file'],'page':p['page'],'status':'success',
+                                   'notes':p['visual_description']} for p in matches],
+                'visual_warnings': warnings,
+                'validation': {'checked':len(matches),'all_sources_supported':True,
+                               'grounding_review':{'checked':False,'outcome':'visual_classification'}},
+                'retrieval':retrieval_mode, 'search_coverage':coverage,
+            }
         hits = hybrid.get_corpus().retrieve(
             question, doc=doc, topic=topic, retrieval_mode=retrieval_mode
         )

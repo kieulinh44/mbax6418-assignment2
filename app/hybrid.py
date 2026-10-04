@@ -144,6 +144,46 @@ def lexical_match_score(query, text):
     return score
 
 
+def query_document_scope(query, pages, doc=None):
+    """Return eligible source slugs, or None when no document scope is given.
+
+    An empty set is an explicit scope with no eligible sources, never permission
+    to fall back to unrelated documents. Only source identities are inspected.
+    """
+    number_words = dict(enumerate((
+        "zero one two three four five six seven eight nine ten eleven twelve "
+        "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty"
+    ).split()))
+    numbers = {word: n for n, word in number_words.items()}
+    number = r"(?:\d+|" + "|".join(numbers) + r")\b"
+    reference = re.compile(r"\b(?:weeks?|w)[\s-]*(" + number + r")", re.I)
+    continuation = re.compile(r"\s*(?:,\s*(?:and\s+)?|\band\s+|\bor\s+|&\s*)("
+                              + number + r")", re.I)
+
+    def weeks(value, lists=False):
+        value = value.replace("_", " ").lower()
+        found = set()
+        for match in reference.finditer(value):
+            token = match.group(1)
+            found.add(int(token) if token.isdigit() else numbers[token])
+            if lists:
+                end = match.end()
+                while (extra := continuation.match(value, end)) is not None:
+                    token = extra.group(1)
+                    found.add(int(token) if token.isdigit() else numbers[token])
+                    end = extra.end()
+        return found
+
+    requested = weeks(query, lists=True)
+    scope = ({p["doc"] for p in pages
+              if requested & (weeks(p["doc"]) | weeks(p.get("file", "")))}
+             if requested else None)
+    if doc:
+        selected = {p["doc"] for p in pages if p["doc"] == doc}
+        scope = selected if scope is None else scope & selected
+    return scope
+
+
 def _is_image_query(query):
     q = query.lower()
     return any(w in q for w in _IMAGE_QUERY_WORDS)
@@ -400,7 +440,10 @@ class Corpus:
         top_k = top_k or config.RETRIEVE_TOP_K
         if not self.chunks:
             return []
+        scope = query_document_scope(query, self.pages, doc)
         cand_i = self._candidate_chunk_ids(doc, topic)
+        if scope is not None:
+            cand_i = [i for i in cand_i if self.chunks[i]["doc"] in scope]
         requested_page = None
         # Only an unambiguous singular reference narrows the search. Multiple
         # references, numeric lists/ranges and decimals keep normal hybrid RAG.
@@ -424,7 +467,10 @@ class Corpus:
             return []
 
         # Apply explicit page constraints inside Chroma, before bounded top-k.
-        where = {"doc": doc} if doc else None
+        where = None
+        if scope is not None:
+            docs = sorted(scope)
+            where = {"doc": docs[0]} if len(docs) == 1 else {"doc": {"$in": docs}}
         if requested_page is not None:
             page_filter = {"page": requested_page}
             where = {"$and": [where, page_filter]} if where else page_filter
@@ -445,7 +491,7 @@ class Corpus:
 
         # 1) keyword (BM25) — raw scores preserve dominance
         res = self.retriever.retrieve(bm25s.tokenize([query], stopwords="en"),
-                                      k=(len(self.chunks) if requested_page is not None
+                                      k=(len(self.chunks) if requested_page is not None or scope is not None
                                          else min(len(self.chunks), 100)))
         kw = {}
         documents = getattr(res, "documents", None)

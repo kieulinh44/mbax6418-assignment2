@@ -208,6 +208,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 /* ---------- evidence ---------- */
 .evidence-layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;align-items:start}
 .answer-pane,#sources{min-width:0}
+.citation-ref{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:0 4px;font:600 12px/1.4 var(--ui);vertical-align:baseline;border:1px solid var(--border);border-radius:4px;background:var(--inset);color:var(--text);text-decoration:none}
+.citation-ref:hover{border-color:var(--accent);background:var(--soft)}
+.slide-evidence{scroll-margin-top:20px}
+.slide-evidence:focus{outline:3px solid var(--accent);outline-offset:3px}
 .answer{line-height:1.8;overflow-wrap:anywhere}
 .answer>p{margin:0 0 14px}
 .answer>p:last-child{margin-bottom:0}
@@ -345,6 +349,38 @@ footer span{color:var(--text);text-transform:uppercase}
 :root[data-theme="dark"] *::-webkit-scrollbar{width:11px;height:11px}
 :root[data-theme="dark"] *::-webkit-scrollbar-thumb{background:#26385c;border:3px solid var(--bg);border-radius:6px}
 :root[data-theme="dark"] *::-webkit-scrollbar-track{background:transparent}
+/* ---------- compact Q&A + conspicuous request feedback ---------- */
+main:has(#panel-qa:not([hidden])) .workspace-bar{min-height:48px;margin-bottom:16px}
+#panel-qa .panel-heading{margin-bottom:14px}
+#panel-qa .panel-heading h2{font-size:clamp(22px,2.7vw,30px);margin:6px 0}
+#panel-qa .panel-heading p{font-size:14px;max-width:760px}
+#panel-qa .step{font-size:44px}
+#panel-qa .composer{margin-bottom:14px}
+#panel-qa .composer-top{padding:10px 16px}
+#panel-qa .composer-body{padding:14px 16px}
+#panel-qa textarea{min-height:78px;height:78px}
+#panel-qa .row,#panel-qa .command-bottom{margin-top:12px}
+#panel-qa .suggestions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+#panel-qa .suggestions>p{margin:0;letter-spacing:.08em}
+#panel-qa .study-note{padding:8px 12px;gap:12px;margin-bottom:14px}
+#askStatus:empty{display:none}
+#askStatus:not(:empty){font:600 14px/1.5 var(--ui);color:var(--text);margin-top:12px}
+#askStatus.error{color:var(--bad)}
+.result-heading{grid-column:1/-1;margin:0;font:700 20px/1.4 var(--ui);scroll-margin-top:20px}
+#result{scroll-margin-top:20px}
+.qa-progress{position:fixed;bottom:20px;right:24px;z-index:100;display:flex;align-items:center;gap:14px;
+  max-width:min(460px,calc(100vw - 28px));padding:16px 20px;border:2px solid var(--accent);
+  border-radius:7px;background:var(--card);color:var(--text);box-shadow:5px 5px 0 var(--shadow)}
+.qa-progress strong{display:block;font:700 16px/1.4 var(--ui)}
+.qa-progress small{display:block;font:14px/1.5 var(--ui);color:var(--text);margin-top:4px}
+.loading-spinner{width:24px;height:24px;flex-shrink:0;border:3px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:loading-turn 1s linear infinite}
+@keyframes loading-turn{to{transform:rotate(360deg)}}
+.explain-status{flex-basis:100%;margin:0;padding:12px;border:2px solid var(--accent);border-radius:5px;background:var(--inset);color:var(--text);font:600 15px/1.5 var(--ui)}
+@media(max-width:480px){
+  #panel-qa .study-note{display:none}
+  #panel-qa .suggestions{gap:8px}
+  .qa-progress{bottom:14px;right:14px;left:14px;padding:12px}
+}
 /* ---------- media ---------- */
 @media(min-width:1500px){main{padding-left:60px;padding-right:60px}}
 @media(max-width:1100px){
@@ -473,6 +509,7 @@ footer span{color:var(--text);text-transform:uppercase}
     <div class="study-note"><strong>Follow the evidence</strong><p>Original slides and page images appear with your answer. Open a source at full size or ask for a closer explanation.</p></div>
   </section>
   <section class="qa evidence-layout" data-panel="qa" id="result" style="display:none" aria-label="Answer and retrieved slides">
+    <h2 id="resultHeading" class="result-heading" tabindex="-1">Answer &amp; slide evidence</h2>
     <div class="answer-pane"><div class="card answer" id="answer" aria-live="polite"></div><div id="visualWarnings" role="status"></div></div>
     <aside id="sources" aria-label="Retrieved course material"></aside>
   </section>
@@ -499,6 +536,7 @@ footer span{color:var(--text);text-transform:uppercase}
 
 <footer><span>Strategy Arcade / Course Assistant</span><p class="contributors">Contributed by Linh Nguyen, Jamie Lin, Kelly Nguyen, Jana Chittarath, and Mirina Gurung</p></footer>
 </main>
+<div id="qaProgress" class="qa-progress" role="status" aria-live="polite" hidden><span class="loading-spinner" aria-hidden="true"></span><div><strong id="qaProgressTitle">Preparing your answer…</strong><small>Still working. Your results will appear when ready.</small></div></div>
 <script>
 const $ = id => document.getElementById(id);
 let quizId = null;
@@ -565,10 +603,18 @@ async function uploadFiles(){
 }
 
 /* ---------- Q&A ---------- */
-async function ask(){
+async function ask(explanation=null){
+  if($('askBtn').disabled) return;
   if(!$('q').value.trim()){setStatus('askStatus','Enter a question to get started.',true);$('q').focus();return;}
   const btn=$('askBtn'); btn.disabled=true; btn.textContent='Asking…';
-  setStatus('askStatus','Searching your materials and preparing an answer…');$('result').setAttribute('aria-busy','true');
+  const question=$('q').value.trim();
+  const collection=(/\bmemes\b/i.test(question)||/\b(all|every|each)\s+(the\s+)?memes?\b/i.test(question))&&/\b(find|show|list|locate|identify|collect|all|every)\b/i.test(question)&&!/\b(explain|compare|interpret)\b/i.test(question);
+  setStatus('askStatus',collection
+    ? 'Inspecting the requested slides for memes. A first full-deck scan can take a few minutes; later searches use cached image checks…'
+    : 'Searching your materials and preparing an answer…');$('result').setAttribute('aria-busy','true');
+  $('qaProgressTitle').textContent=explanation?`Explaining ${explanation.kind==='pptx'?'slide':'page'} ${explanation.page}…`:'Preparing your answer…';
+  $('qaProgress').hidden=false;
+  document.querySelectorAll('.explain-slide').forEach(b=>b.disabled=true);
   const payload={question:$('q').value, doc:$('doc').value||null, topic:$('topic').value||null};
   try{
     const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -576,7 +622,7 @@ async function ask(){
     if(!r.ok) throw new Error(data.detail||'Question failed');
     $('result').hidden = !document.querySelector('[data-tab="qa"]').classList.contains('active');
     $('result').style.display='grid';
-    renderAnswer(data.answer);
+    renderAnswer(data.answer,data.sources||[]);
     $('visualWarnings').innerHTML=(data.visual_warnings||[]).map(w=>`<p class="visual-warning">${esc(w)}</p>`).join('');
     renderSources(data.sources||[]);
     setStatus('askStatus','Answer ready. Review the response and its course sources below.');
@@ -588,21 +634,51 @@ async function ask(){
     const error=document.createElement('p');error.className='status error';error.textContent='Could not answer: '+e.message;$('answer').append(error);
     $('sources').replaceChildren();$('visualWarnings').replaceChildren();
   }
-  finally{ btn.disabled=false; btn.textContent='Ask';$('result').setAttribute('aria-busy','false'); }
+  finally{
+    btn.disabled=false; btn.textContent='Ask';$('result').setAttribute('aria-busy','false');
+    $('qaProgress').hidden=true;
+    document.querySelectorAll('.explain-slide').forEach(b=>b.disabled=false);
+    document.querySelectorAll('.explain-status').forEach(el=>el.remove());
+    if(!$('result').hidden){
+      const heading=$('resultHeading'), box=heading.getBoundingClientRect();
+      if(box.top<0||box.bottom+90>innerHeight) heading.scrollIntoView({block:'start',behavior:'instant'});
+      if(explanation) heading.focus({preventScroll:true});
+    }
+  }
 }
 
 
-function appendAnswerText(container,text){
-  const bold=/\*\*([^*]+)\*\*/g;
+function appendAnswerText(container,text,sources=[]){
+  const refs=new Map();
+  // Only shorten references that map exactly to returned source metadata.
+  // Preserve unknown references verbatim rather than implying a verified link.
+  text=text.replace(/\[([^\]\n]+?)\s+p\.\s*(\d+)\]/g,(raw,file,page)=>{
+    const index=sources.findIndex(s=>s.file===file&&Number(s.page)===Number(page));
+    if(index<0) return raw;
+    refs.set(index,sources[index]);return '';
+  }).replace(/[ \t]+([.,;:!?])/g,'$1').replace(/[ \t]{2,}/g,' ').trim();
+  const emphasis=/\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
   let start=0,match;
-  while((match=bold.exec(text))!==null){
+  while((match=emphasis.exec(text))!==null){
     container.append(document.createTextNode(text.slice(start,match.index)));
-    const strong=document.createElement('strong');
-    strong.textContent=match[1];
-    container.append(strong);
+    const element=document.createElement(match[1]!==undefined?'strong':'em');
+    element.textContent=match[1]??match[2];
+    container.append(element);
     start=match.index+match[0].length;
   }
   container.append(document.createTextNode(text.slice(start)));
+  for(const [index,source] of refs){
+    const link=document.createElement('a');
+    const label=(source.kind==='pptx'||source.file.endsWith('.pptx')?'Slide ':'Page ')+source.page;
+    link.className='citation-ref';link.href=`#source-${index+1}`;link.textContent=`[${index+1}]`;
+    link.title=`${source.file} · ${label}`;
+    link.setAttribute('aria-label',`Source ${index+1}: ${source.file}, ${label}`);
+    link.onclick=e=>{
+      const target=document.getElementById(`source-${index+1}`);
+      if(target){e.preventDefault();target.scrollIntoView({block:'start',behavior:'instant'});target.focus({preventScroll:true});}
+    };
+    container.append(document.createTextNode(' '),link);
+  }
 }
 
 function classifyAnswerHeading(line){
@@ -621,7 +697,7 @@ function classifyAnswerHeading(line){
   return null;
 }
 
-function renderAnswer(answer){
+function renderAnswer(answer,sources=[]){
   const el=$('answer');
   el.replaceChildren();
   let current=el,sectionCount=0,listStack=[],lastListItem=null;
@@ -638,7 +714,7 @@ function renderAnswer(answer){
       entry={tag,indent,list,lastItem:null}; listStack.push(entry);
     }
     const item=document.createElement('li');
-    appendAnswerText(item,text); entry.list.append(item);
+    appendAnswerText(item,text,sources); entry.list.append(item);
     entry.lastItem=item; lastListItem=item;
   };
   for(const rawLine of String(answer||'').split(/\r?\n/)){
@@ -667,11 +743,11 @@ function renderAnswer(answer){
     }
     if(lastListItem&&(/^\s+/.test(rawLine)||/^\[[^\]]+\]$/.test(line))){
       lastListItem.append(document.createTextNode(' '));
-      appendAnswerText(lastListItem,line); continue;
+      appendAnswerText(lastListItem,line,sources); continue;
     }
     resetLists();
     const paragraph=document.createElement('p');
-    appendAnswerText(paragraph,line); current.append(paragraph);
+    appendAnswerText(paragraph,line,sources); current.append(paragraph);
   }
   if(!el.childNodes.length) el.textContent='No answer was returned.';
 }
@@ -683,8 +759,8 @@ function renderSources(sources){
   el.innerHTML+=sources.map((c,index)=>{
     const label=c.label || ((c.kind==='pptx'||c.file.endsWith('.pptx'))?'Slide ':'Page ')+c.page;
     const image=c.image&&c.image.startsWith('/pages/')?c.image:null;
-    const caption=`<strong>${esc(c.file)}</strong><span class="muted">${esc(label)}${c.section?' · '+esc(c.section):''}</span>`;
-    return `<article class="card slide-evidence"><figure>
+    const caption=`<strong>${esc(c.file)}</strong><span class="muted">Source ${index+1} · ${esc(label)}${c.section?' · '+esc(c.section):''}</span>`;
+    return `<article class="card slide-evidence" id="source-${index+1}" tabindex="-1"><figure>
       <figcaption>${caption}</figcaption>
       ${image?`<a href="${esc(image)}" target="_blank" rel="noopener" aria-label="Open ${esc(c.file)} ${esc(label)} full size"><img src="${esc(image)}" alt="Actual ${esc(label.toLowerCase())} from ${esc(c.file)}" loading="lazy"></a>`:`<div class="image-unavailable">${c.kind==='pptx'?'Slide image is not available for this document.':'No rendered page image is available for this source.'} The answer can use its extracted text only.</div>`}
       </figure>
@@ -693,12 +769,17 @@ function renderSources(sources){
       </article>`;
   }).join('');
   el.querySelectorAll('.explain-slide').forEach(button=>button.onclick=()=>{
+    if($('askBtn').disabled) return;
     const source=sources[Number(button.dataset.source)];
+    button.textContent=`Explaining ${source.kind==='pptx'?'slide':'page'} ${source.page}…`;
+    const status=document.createElement('p');status.className='explain-status';status.setAttribute('role','status');
+    status.textContent=`Explaining ${source.kind==='pptx'?'slide':'page'} ${source.page}. Still working — please wait…`;
+    button.parentElement.append(status);
     $('doc').value=source.doc;
     $('topic').value='';
     $('q').value=`Explain ${source.kind==='pptx'?'slide':'page'} ${source.page}, including any pictures, diagrams, and charts. Describe what is visible and explain it using the retrieved course materials.`;
     switchTab('qa');
-    ask();
+    ask(source);
   });
   el.querySelectorAll('img').forEach(image=>image.onerror=()=>{
     const notice=document.createElement('div');
@@ -810,7 +891,7 @@ document.querySelectorAll('.tab').forEach((t,index,tabs)=>{
   };
 });
 switchTab('qa');
-$('askBtn').onclick=ask;
+$('askBtn').onclick=()=>ask();
 $('genBtn').onclick=generateQuiz;
 $('uploadBtn').onclick=uploadFiles;
 refreshFiles().catch(()=>{$('files').textContent='Could not load your documents. Refresh the page to try again.';});

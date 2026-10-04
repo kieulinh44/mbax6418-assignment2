@@ -30,6 +30,19 @@ def test_unchecked_quiz_radios_have_nontext_contrast(page):
         assert contrast(colors['outline'],colors['outside']) >= 3, (mode,colors)
 
 
+def test_collection_request_explains_full_deck_scan_while_loading(page):
+    pending=[]
+    page.route('**/api/ask',lambda route:pending.append(route))
+    page.locator('#q').fill('find all the memes from the week 2 slides')
+    page.locator('#askBtn').click()
+    try:
+        assert 'Inspecting' in page.locator('#askStatus').inner_text()
+        assert 'cached' in page.locator('#askStatus').inner_text()
+        assert page.locator('#askBtn').is_disabled()
+    finally:
+        for route in pending:route.abort()
+
+
 def test_no_ambiguous_initials_logo(page):
     assert page.locator('.brand-mark').count() == 0
     assert 'Strategy Arcade' in page.locator('header h1').inner_text()

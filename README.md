@@ -46,6 +46,30 @@ an image (so answers can show pictures of the actual slides).
   `data/index/pages/` (files named `<deck>_sNNN.png` — open a few and eyeball
   them against the original deck).
 
+## Scoped questions and meme collections
+
+Week references in a question (for example, `week 2`, `Week 02`, or `week two`)
+restrict retrieval to matching source filenames/document identities **before**
+keyword, text, and visual ranking. A syllabus merely mentioning that week is
+not a matching source. The document dropdown and topic filter remain additional
+constraints; conflicting or absent scopes return no unrelated fallback.
+
+Collection requests such as **“find all the memes from the week 2 slides”** use
+an exhaustive visual inspection instead of the usual top-six ranked results.
+Each eligible rendered slide is classified independently. Only confirmed meme
+or humorous-visual matches appear in the source gallery, in slide order.
+The answer reports reviewed/total coverage and explicitly marks incomplete
+searches when images are missing, classification fails, or a decision is
+uncertain. “Complete” means all eligible images received a conclusive model
+classification, not a guarantee that model judgments are infallible.
+
+The first collection search may take a few minutes. Conclusive image decisions
+are cached locally in `data/index/visual-meme-cache.json` (gitignored); cache
+identity includes the image content hash, classifier version, endpoint and model.
+Changed images are reclassified. Ordinary single-meme explanations and standard
+Q&A continue using hybrid RAG. Collection discovery is only enabled in `hybrid`
+mode; `text_keyword_only` evaluation does not silently call vision.
+
 ## Slide-image RAG and visual questions
 
 Q&A combines BM25 keyword retrieval, text embeddings, and CLIP slide-image
