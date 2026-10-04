@@ -33,10 +33,10 @@ class VisualAnswersTests(unittest.TestCase):
                          "kind": kind, "image": path, "text": "course evidence"},
                 "chunk": "course evidence"}
 
-    def test_available_images_beyond_first_three_are_individually_attributed(self):
+    def test_singular_visual_question_analyzes_only_best_available_image(self):
         self.corpus.retrieve.return_value = [self.hit(n, image=n > 3) for n in range(1, 8)]
         result = main.ask({"question": "What does the flow diagram mean?"})
-        self.assertEqual(self.vision.call_count, 3)
+        self.assertEqual(self.vision.call_count, 1)
         for call in self.vision.call_args_list:
             prompt, paths = call.args
             self.assertEqual(len(paths), 1)
@@ -45,8 +45,8 @@ class VisualAnswersTests(unittest.TestCase):
             self.assertIn(f"[lecture.pptx p.{number}]", prompt)
         self.assertEqual([v for v in result["vision_sources"] if v["status"] == "success"], [
             {"file": "lecture.pptx", "page": n, "status": "success",
-             "notes": f"Observed slide-{n}.png"} for n in (4, 5, 6)])
-        for n in (4, 5, 6):
+             "notes": f"Observed slide-{n}.png"} for n in (4,)])
+        for n in (4,):
             self.assertIn(f"[lecture.pptx p.{n}]", result["vision_notes"])
             self.assertIn(f"Observed slide-{n}.png", result["vision_notes"])
         self.assertIn(result["vision_notes"], self.chat.call_args.args[0][1]["content"])
@@ -153,9 +153,9 @@ class VisualAnswersTests(unittest.TestCase):
         self.assertTrue(result["visual_warnings"])
         self.assertIn("Visual limitations:", result["answer"])
 
-    def test_three_visual_calls_run_concurrently_and_keep_partial_success_attributed(self):
+    def test_comparison_visual_calls_run_concurrently_and_keep_partial_success_attributed(self):
         self.corpus.retrieve.return_value = [self.hit(n) for n in range(1, 5)]
-        barrier = threading.Barrier(3, timeout=2)
+        barrier = threading.Barrier(2, timeout=2)
 
         def concurrent_description(prompt, paths):
             barrier.wait()
@@ -165,11 +165,10 @@ class VisualAnswersTests(unittest.TestCase):
 
         self.vision.side_effect = concurrent_description
         result = main.ask({"question": "Explain the diagrams"})
-        self.assertEqual(self.vision.call_count, 3)
+        self.assertEqual(self.vision.call_count, 2)
         self.assertEqual([v["status"] for v in result["vision_sources"]],
-                         ["success", "failed", "success"])
+                         ["success", "failed"])
         self.assertIn("[lecture.pptx p.1]", result["vision_notes"])
-        self.assertIn("[lecture.pptx p.3]", result["vision_notes"])
         self.assertNotIn("[lecture.pptx p.2]", result["vision_notes"])
         self.assertEqual(len(result["visual_warnings"]), 1)
         self.assertIn("[lecture.pptx p.2]", result["visual_warnings"][0])

@@ -124,7 +124,8 @@ def test_api_forwards_default_and_explicit_retrieval_mode(monkeypatch):
     monkeypatch.setattr(main.hybrid, "get_corpus", lambda: EmptyCorpus())
     main.ask({"question": "test"})
     main.ask({"question": "test", "retrieval_mode": "text_keyword_only"})
-    assert seen == ["hybrid", "text_keyword_only"]
+    main.ask({"question": "Compare the charts"})
+    assert seen == ["text_keyword_only", "text_keyword_only", "hybrid"]
 
 
 def test_evaluator_row_contains_timing_sources_validation_and_manual_fields():

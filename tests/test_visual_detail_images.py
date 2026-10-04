@@ -137,4 +137,4 @@ class VisualDetailImagesTests(unittest.TestCase):
                 self.assertEqual(llm.vision("Read the chart", [uri]), "Observed chart")
         content = complete.call_args.args[3][0]["content"]
         self.assertEqual(content[1]["image_url"]["url"], uri)
-        self.assertEqual(complete.call_args.kwargs["max_tokens"], 4096)
+        self.assertEqual(complete.call_args.kwargs["max_tokens"], 1200)
