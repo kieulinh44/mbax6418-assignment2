@@ -333,6 +333,37 @@ and memes while also performing faster in this evaluation run. The full
 per-question comparison, manual source review, timings, and validation notes
 are in [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md).
 
+## Tested vs Unchecked
+
+**Tested ✅**
+- Grounded Q&A with cited sources and slide-image evidence; honest
+  "not in the materials" refusals
+- Practice quizzes: server-side answer keys, scoring, explanations,
+  reveal-on-demand
+- Upload/download/remove documents: duplicate uploads refused; removal
+  purges pages, chunks, embeddings, and images from the index
+- Visual retrieval: actual slides shown with document + slide number;
+  diagram and meme questions; "find all memes" collections
+- PPTX ingestion with LibreOffice slide rendering; PDF / DOCX / MD / TXT
+- Light/dark themes
+- Automated suite: 146 passing tests (unit, API, retrieval, browser/UI)
+- Evaluation: the 9-question set over the real syllabus and Weeks 2–5
+  slides — both retrieval modes answered 9/9 correctly with supported
+  sources (details in `docs/EVALUATION_RESULTS.md`)
+- Security: no keys or endpoint URLs are committed; configuration comes
+  from environment variables or the git-ignored `.env` file
+
+**Unchecked / limitations ⚠️**
+- Setup has not been validated by an outsider following the README from a
+  fresh clone on another machine
+- Large batches of simultaneous uploads and multi-user concurrent sessions
+  are not load-tested
+- Long-running stability: the quiz store is in-memory and resets on server
+  restart
+- Automated citation validation marks some otherwise-supported answers as
+  unsupported, so source-support judgments rely on manual review (see the
+  evaluation notes)
+
 ## Notes
 
 - Course material and the generated index are **gitignored** (public repo;
