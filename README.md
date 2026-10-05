@@ -152,19 +152,51 @@ Original content and generated indexes remain local and gitignored.
 
 ## Setup
 
+**Prerequisites**
+
+- **Python 3.11+** (`python3.11 --version`)
+- Optional but recommended: **LibreOffice** for PPTX slide renders
+  (`winget install --id TheDocumentFoundation.LibreOffice -e` on Windows,
+  `brew install --cask libreoffice` on macOS). Without it, `.pptx` text still
+  indexes but slide *images* are not produced (export the deck to PDF instead).
+
+**Install**
+
 ```bash
+git clone https://github.com/kieulinh44/mbax6418-assignment2.git
+cd mbax6418-assignment2
 python -m venv .venv
 # Windows: .venv\Scripts\activate   |  macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-
-# Optional but recommended: PPTX slides render as images only if LibreOffice is
-# installed (winget install --id TheDocumentFoundation.LibreOffice -e).
 ```
 
-**Model endpoints (chat + vision):** copy `.env.example` to `.env` and fill in
-the team's OpenAI-compatible endpoint values, or export the `DOBOLYI_*`
-environment variables. The app reads the keys from the environment or the
-git-ignored `.env` file at runtime — never from the repository.
+## Configuration (model endpoints)
+
+The app calls two OpenAI-compatible services: a **chat** model (grounded
+answers, quiz writing) and a **vision** model (reads diagrams and memes in
+slide images). Connection details are read from environment variables or a
+local, git-ignored `.env` file — never from the repository.
+
+1. Copy the template: `cp .env.example .env`
+2. Fill in the real values (ask your team for the class-endpoint details):
+
+| Variable | Purpose | Example (dummy) |
+|---|---|---|
+| `DOBOLYI_CHAT_BASE` | Chat endpoint base URL | `https://api.example.invalid/v1` |
+| `DOBOLYI_CHAT_KEY` | Chat endpoint key | `sk-dummy-change-me` |
+| `DOBOLYI_CHAT_MODEL` | Chat model name | `example-chat-model` |
+| `DOBOLYI_VISION_BASE` | Vision endpoint base URL | `https://api.example.invalid/v1` |
+| `DOBOLYI_VISION_KEY` | Vision endpoint key | `sk-dummy-change-me` |
+| `DOBOLYI_VISION_MODEL` | Vision model name | `example-vision-model` |
+
+Alternatively, export these as environment variables before launching. The
+local embedding model (`all-MiniLM-L6-v2`) runs on your machine and needs no
+endpoint.
+
+**Running without keys:** the app still works — answering and quiz generation
+return an honest "model service is currently unavailable" message together
+with the retrieved course evidence and slide images. Configure the endpoints
+to get full generated answers.
 
 ## Run
 
@@ -183,7 +215,12 @@ python scripts/sample_pdf.py      # writes data/raw/sample-lecture.pdf
 python -m scripts.ingest
 python -m uvicorn app.main:app --reload --port 8000
 ```
-Then ask: "What is L2 regularization and how does it differ from L1?"
+Then ask: "What is L2 regularization and how does it differ from L1?" — you
+should see the answer and the retrieved slide images below it.
+
+**Sanity checks:** `curl http://localhost:8000/api/health` → `{"ok":true}`
+(or open the dashboard and confirm the Q&A, Practice Quiz, and Materials tabs
+render).
 
 ## Tests
 
