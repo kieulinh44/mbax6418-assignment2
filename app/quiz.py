@@ -59,7 +59,7 @@ def _build_lookup(pages):
     return look
 
 
-def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=3000):
+def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=2000):
     """Retrieve candidate pages, have the model write MCQs, return quiz with a
     fixed answer key (answer_idx + explanation) in server-side storage."""
     try:
@@ -67,7 +67,10 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
     except (TypeError, ValueError):
         n = 4
     theme = (question_theme or "").strip() or "the selected course material"
-    pages_res = hybrid.get_corpus().retrieve(theme, top_k=10, doc=doc, topic=topic)
+    pages_res = hybrid.get_corpus().retrieve(
+        theme, top_k=6, doc=doc, topic=topic,
+        retrieval_mode="text_keyword_only",
+    )
     if not pages_res:
         return None
     hits = [r["page"] for r in pages_res]
@@ -76,7 +79,7 @@ def generate_quiz(question_theme=None, n=4, doc=None, topic=None, max_tokens=300
         f"[Document: {p['file']} | page/slide {p['page']}"
         + (f" | section: {p['section']}" if p.get("section") else "")
         + "]\n" + (p.get("text") or "").strip()
-        for p in hits[:8]
+        for p in hits[:6]
     )
 
     sys = (

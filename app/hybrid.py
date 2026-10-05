@@ -195,12 +195,20 @@ class Corpus:
         self._lock = threading.Lock()
         self.pages = load_pages()
         self.chunks = self._load_chunks(rebuild)
-        self.text_enc = _text_encoder()
-        self._init_chroma()
+        self.text_enc = None
+        self.client = self.text_coll = self.visual_coll = None
         self._build_keyword()          # small corpus -> build in memory each start
         if rebuild:
+            self._ensure_vector_indexes()
             self._build_text_vectors()
             self._build_visual_vectors()
+
+    def _ensure_vector_indexes(self):
+        """Load heavyweight vector dependencies only for hybrid operations."""
+        if self.text_enc is None:
+            self.text_enc = _text_encoder()
+        if self.text_coll is None or self.visual_coll is None:
+            self._init_chroma()
 
     # ---- persistence ---------------------------------------------------
     def _chunks_path(self):
@@ -239,6 +247,7 @@ class Corpus:
         self.retriever.index(tok)
 
     def _build_text_vectors(self):
+        self._ensure_vector_indexes()
         vecs = self.text_enc.encode(self._all_texts(), batch_size=32)
         ids = [c["cid"] for c in self.chunks]
         metas = [{"doc": c["doc"], "page": int(c["page"])}
@@ -248,6 +257,7 @@ class Corpus:
                            documents=self._all_texts())
 
     def _build_visual_vectors(self):
+        self._ensure_vector_indexes()
         clip = _clip_model()
         rows = []
         for p in self.pages:
@@ -300,6 +310,7 @@ class Corpus:
 
     def _add_new_text_vectors(self):
         """Embed + upsert only chunks not already in the text collection."""
+        self._ensure_vector_indexes()
         existing = set(self.text_coll.get()["ids"])
         new = [c for c in self.chunks if c["cid"] not in existing]
         if not new:
@@ -314,6 +325,7 @@ class Corpus:
 
     def _add_new_visual_vectors(self, new_pages):
         """Embed + upsert only page images not already in the visual collection."""
+        self._ensure_vector_indexes()
         existing = set(self.visual_coll.get()["ids"])
         clip = _clip_model()
         rows = []
@@ -356,6 +368,7 @@ class Corpus:
     def _visual_page_hits(self, query, doc, top_n=20, where=None):
         """Cross-modal text->image query over the visual index.
         Returns [(page_index, similarity), ...] ordered by similarity."""
+        self._ensure_vector_indexes()
         if not self.visual_coll.count():
             return []
         clip = _clip_model()
@@ -395,6 +408,7 @@ class Corpus:
             _atomic_write_json(self._chunks_path(), keep_chunks)
 
             # vectors
+            self._ensure_vector_indexes()
             to_del_txt = [c for c in drop_cids if c in self.text_coll.get()["ids"]]
             if to_del_txt:
                 self.text_coll.delete(ids=to_del_txt)
@@ -512,21 +526,22 @@ class Corpus:
                 kw[cid] = kw.get(cid, 0.0) + boost
         add_stage(kw, 1.0)
 
-        # 2) text embeddings (chromadb), filtered to candidates
-        qv = self.text_enc.encode(query).tolist()
         txt = {}
-        try:
-            res = self.text_coll.query(query_embeddings=[qv],
-                                       n_results=min(60, max(len(cand_set), 1)),
-                                       where=where)
-            ids = res.get("ids") or []
-            distances = res.get("distances") or []
-            if ids and distances and ids[0] and distances[0]:
-                txt = {cid: 1.0 - float(d) for cid, d in zip(ids[0], distances[0])
-                       if cid in cand_cids}
-            add_stage(txt, 1.0)
-        except Exception:
-            log.exception("chroma text-embedding query failed")
+        if retrieval_mode == "hybrid":
+            self._ensure_vector_indexes()
+            try:
+                qv = self.text_enc.encode(query).tolist()
+                res = self.text_coll.query(query_embeddings=[qv],
+                                           n_results=min(60, max(len(cand_set), 1)),
+                                           where=where)
+                ids = res.get("ids") or []
+                distances = res.get("distances") or []
+                if ids and distances and ids[0] and distances[0]:
+                    txt = {cid: 1.0 - float(d) for cid, d in zip(ids[0], distances[0])
+                           if cid in cand_cids}
+                add_stage(txt, 1.0)
+            except Exception:
+                log.exception("chroma text-embedding query failed")
 
         # 3) visual embeddings (CLIP) — cross-modal. For text questions, visual
         #    only BOOSTS pages already surfaced by keyword/text (avoids irrelevant

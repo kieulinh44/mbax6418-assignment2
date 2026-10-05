@@ -12,19 +12,57 @@ import requests
 from . import config
 
 
+def _discover_current_model(base, key, configured):
+    """Return the service's sole advertised model when config has gone stale."""
+    try:
+        response = requests.get(
+            f"{base.rstrip('/')}/models",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=(5, 15),
+        )
+        response.raise_for_status()
+        choices = [row.get("id") for row in response.json().get("data", [])
+                   if row.get("id")]
+        if configured in choices:
+            return configured
+        if len(choices) == 1:
+            return choices[0]
+    except Exception:
+        pass
+    return configured
+
+
 def _complete(base, key, model, messages, max_tokens=4096, temperature=0.2):
+    if not base or not key or not model:
+        raise RuntimeError("Model service is not configured")
+    timeout_seconds = max(10, int(os.environ.get("DOBOLYI_REQUEST_TIMEOUT", "75")))
+    url = f"{base.rstrip('/')}/chat/completions"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
     resp = requests.post(
-        f"{base}/chat/completions",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "chat_template_kwargs": {"enable_thinking": False},
-        },
-        timeout=180,
+        url,
+        headers=headers,
+        json=payload,
+        timeout=(10, timeout_seconds),
     )
+    # Class services can change the served model while an older endpoint file
+    # remains on disk. Retry once with the sole model advertised by /models.
+    if resp.status_code == 404:
+        current = _discover_current_model(base, key, model)
+        if current != model:
+            payload["model"] = current
+            resp = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=(10, timeout_seconds),
+            )
     resp.raise_for_status()
     data = resp.json()
     choice = data["choices"][0]
@@ -46,19 +84,19 @@ def _image_data_uri(path):
     return f"data:{mime};base64,{b64}"
 
 
-def chat(messages, max_tokens=4096, temperature=0.2):
+def chat(messages, max_tokens=1800, temperature=0.2):
     """Text chat against the reasoning model (DeepSeek)."""
     return _complete(config.CHAT_BASE, config.CHAT_KEY, config.CHAT_MODEL,
                      messages, max_tokens=max_tokens, temperature=temperature)
 
 
-def ground(messages, max_tokens=4096):
+def ground(messages, max_tokens=1400):
     """Run a second, low-temperature pass that edits an answer for evidence support."""
     return _complete(config.CHAT_BASE, config.CHAT_KEY, config.CHAT_MODEL,
                      messages, max_tokens=max_tokens, temperature=0.0)
 
 
-def vision(prompt, image_paths, max_tokens=4096):
+def vision(prompt, image_paths, max_tokens=1200):
     """Ask the vision model (Qwen) about one or more page images."""
     content = [{"type": "text", "text": prompt}]
     for p in image_paths:

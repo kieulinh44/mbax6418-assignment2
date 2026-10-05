@@ -175,6 +175,26 @@ def _is_singular_visual_locator(question):
     return bool(locator and target and not multiple)
 
 
+def _needs_visual_analysis(question):
+    """Use expensive visual services only when the question actually needs them."""
+    return bool(re.search(
+        r"\b(slides?|pages?|memes?|pictures?|images?|diagrams?|charts?|graphs?|"
+        r"screenshots?|figures?|visuals?|look like|shown|displayed)\b",
+        question.lower(),
+    ))
+
+
+def _visual_evidence_limit(question):
+    """Inspect one image normally and two only for an explicit comparison."""
+    text = question.lower()
+    multiple = re.search(
+        r"\b(compare|contrast|both|multiple|several|across)\b|"
+        r"\b(slides|pages|images|diagrams|charts|graphs|figures)\b",
+        text,
+    )
+    return 2 if multiple else 1
+
+
 def _display_hits(question, answer, hits):
     """Keep retrieval broad internally but expose only answer-supporting evidence.
 
@@ -344,6 +364,15 @@ def ask(payload: dict):
 
     try:
         retrieval_mode = hybrid.normalize_retrieval_mode(retrieval_mode)
+        visual_question = _needs_visual_analysis(question)
+        # Routine text questions and singular visual lookups are well served by
+        # BM25 and avoid loading local embedding models. Open-ended visual
+        # searches retain full hybrid text/visual retrieval.
+        effective_retrieval_mode = (
+            retrieval_mode
+            if visual_question and not _is_singular_visual_locator(question)
+            else "text_keyword_only"
+        )
         if retrieval_mode == 'hybrid' and visual_search.is_meme_collection(question):
             result = visual_search.search_memes(
                 question, hybrid.load_pages(), doc=doc, topic=topic)
@@ -385,7 +414,7 @@ def ask(payload: dict):
                 'retrieval':retrieval_mode, 'search_coverage':coverage,
             }
         hits = hybrid.get_corpus().retrieve(
-            question, doc=doc, topic=topic, retrieval_mode=retrieval_mode
+            question, doc=doc, topic=topic, retrieval_mode=effective_retrieval_mode
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -408,6 +437,7 @@ def ask(payload: dict):
 
     # Best evidence: top chunks as context, original page images as visual evidence
     context_blocks = []
+    vision_limit = _visual_evidence_limit(question) if visual_question else 0
     for h in hits:
         p = h["page"]
         context_blocks.append(
@@ -432,7 +462,7 @@ def ask(payload: dict):
                 vision_sources.append({"file": p["file"], "page": p["page"],
                                        "status": "unavailable", "notes": ""})
             continue
-        if len(selected_images) == 3:
+        if len(selected_images) == vision_limit:
             continue
         source = {"file": p["file"], "page": p["page"], "status": "pending", "notes": ""}
         vision_sources.append(source)
@@ -569,7 +599,7 @@ def ask(payload: dict):
         "vision_sources": vision_sources,
         "visual_warnings": visual_warnings,
         "validation": validation,
-        "retrieval": retrieval_mode,
+        "retrieval": effective_retrieval_mode,
     }
 
 
