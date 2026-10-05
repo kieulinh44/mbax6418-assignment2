@@ -274,6 +274,11 @@ query → run all three → weighted score fusion (rerank)
   filename and exact page/slide number. The response carries separate `answer`
   and `sources` fields plus `validation.all_sources_supported` and
   `validation.grounding_review`.
+- **Performance:** heavy vector models (MiniLM/CLIP) and the chroma
+  collections load lazily — only when a hybrid retrieval actually needs them —
+  so server startup is fast; the chat client also auto-discovers the
+  endpoint's current model when the configured model name is stale (see
+  `app/hybrid.py`, `app/llm.py`).
 
 ## Evaluation
 
